@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <!-- Include Premium CSS Stylesheet -->
+  <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
+</head>
+
+<body>
+
+  <div class="app-container">
+    <!-- Header Area -->
+    <header>
+      <div class="brand">
+        <span class="brand-icon">✦</span>
+        <h1>Meal Planning Assistant</h1>
+      </div>
+      <nav>
+        <button class="nav-tab active" data-view="planner">🍽️ Planner</button>
+        <button class="nav-tab" data-view="preferences">⚙️ Preferences</button>
+        <button class="nav-tab" data-view="settings">🔑 Settings</button>
+      </nav>
+    </header>
+
+    <!-- Main Content Views -->
+    <main>
+
+      <!-- LOADING SCREEN OVERLAY -->
+      <div class="loading-overlay" id="loader">
+        <div class="loader"></div>
+        <div class="loading-text" id="loading-title">Loading...</div>
+        <div class="loading-subtext" id="loading-subtext">Please wait while we set up the application.</div>
+      </div>
+
+      <!-- VIEW: PLANNER -->
+      <div class="view active" id="planner-view">
+        <div id="planner-container">
+          <!-- Dynamic meal plan, cards, and execution reports are rendered here -->
+        </div>
+      </div>
+
+      <!-- VIEW: PREFERENCES -->
+      <div class="view" id="preferences-view">
+        <div class="panel">
+          <h2 class="panel-title">🍽️ Dietary Preferences & Inventory</h2>
+
+          <div class="form-group">
+            <label for="pref-allergies">Dietary Allergy Constraints</label>
+            <div class="input-desc">Specify any ingredients to strictly avoid due to allergies.</div>
+            <textarea id="pref-allergies" placeholder="e.g., No eggs..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="pref-restrictions">General Dietary Restrictions</label>
+            <div class="input-desc">Specify general dietary choices, restrictions, or themes.</div>
+            <textarea id="pref-restrictions" placeholder="e.g., No fish or seafood..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="pref-inventory">Inventory Management Constraints</label>
+            <div class="input-desc">Highlight ingredients that you have in abundance and wish to prioritize.</div>
+            <textarea id="pref-inventory" placeholder="e.g., Prioritize the use of potatoes..."></textarea>
+          </div>
+
+          <div style="margin-top: 24px;">
+            <button class="btn" onclick="handleSavePreferences()">💾 Save Preferences</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: SETTINGS -->
+      <div class="view" id="settings-view">
+        <div class="panel">
+          <h2 class="panel-title">🔑 Configuration & API Keys</h2>
+
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+              <label style="margin-bottom:0;">Gemini API Key</label>
+              <div id="api-badge" class="api-badge missing">• Checking status...</div>
+            </div>
+            <div class="input-desc">Required to authenticate and run the Gemini AI generation models. Saved in Apps
+              Script User Properties (private to you).</div>
+            <input type="text" id="api-key-input" placeholder="Paste your AIzaSy... key here">
+          </div>
+
+          <div style="display: flex; gap: 12px; margin-top: 24px;">
+            <button class="btn" onclick="handleSaveApiKey()">🔑 Save API Key</button>
+            <button class="btn btn-secondary btn-danger" onclick="handleDeleteApiKey()">❌ Clear API Key</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title" style="font-size: 16px; margin-bottom: 12px;">ℹ️ App Deployment & Information</h3>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
+            This system runs entirely serverless within your Google Account.
+            All recipe details and meal history are saved securely in your Google Drive inside the file
+            <strong style="color:var(--accent-secondary);">Automated_Meal_Planner_DB.json</strong>.
+          </p>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+            Upon meal plan approval, the assistant will automatically generate:
+          </p>
+          <ul
+            style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
+            <li>Google Docs for individual recipes inside a folder called <strong>Meal Prep Recipes</strong>.</li>
+            <li>Prep & cook events scheduled on your default Google Calendar.</li>
+            <li>A single consolidated, smart-merged shopping list Google Doc.</li>
+          </ul>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- TOAST NOTIFICATION -->
+    <div class="toast" id="toast">
+      <span>Notification Message</span>
+    </div>
+  </div>
+
+  <!-- Include Client-Side JS -->
+  <?!= HtmlService.createHtmlOutputFromFile('JavaScript').getContent(); ?>
+</body>
+
+</html>

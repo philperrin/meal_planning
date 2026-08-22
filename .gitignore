@@ -1,0 +1,10 @@
+# Google Clasp and Node dependencies
+node_modules/
+creds.json
+.clasp.json
+package-lock.json
+
+# Local configurations and logs
+*.log
+.DS_Store
+Thumbs.db
