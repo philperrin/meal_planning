@@ -134,7 +134,7 @@ function generateMealPlanServer() {
                  "Since russet potatoes are in abundance, make sure russet potatoes are utilized in creative ways across all recipes. " +
                  "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";
                  
-    var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey;
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
     
     // Define the response schema to guarantee JSON formatting
     var payload = {
