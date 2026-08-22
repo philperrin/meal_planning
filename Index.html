@@ -16,6 +16,7 @@
       </div>
       <nav>
         <button class="nav-tab active" data-view="planner">🍽️ Planner</button>
+        <button class="nav-tab" data-view="history">📜 History</button>
         <button class="nav-tab" data-view="preferences">⚙️ Preferences</button>
         <button class="nav-tab" data-view="settings">🔑 Settings</button>
       </nav>
@@ -44,6 +45,19 @@
         </div>
         <div id="planner-container">
           <!-- Dynamic meal plan, cards, and execution reports are rendered here -->
+        </div>
+      </div>
+
+      <!-- VIEW: HISTORY -->
+      <div class="view" id="history-view">
+        <div class="panel">
+          <h2 class="panel-title">📜 Recipe History</h2>
+          <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+            Below are the 25 most recently created recipes from your <strong>Meal Plan Recipes</strong> folder in Google Drive.
+          </p>
+          <div id="history-container">
+            <!-- Dynamic history items list is rendered here -->
+          </div>
         </div>
       </div>
 

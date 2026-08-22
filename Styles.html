@@ -755,4 +755,62 @@ textarea {
     padding: 20px;
   }
 }
+
+/* History Tab Styles */
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.history-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(16, 185, 129, 0.2);
+  transform: translateX(4px);
+}
+
+.history-item-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.history-item-date {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--accent-secondary);
+  background: rgba(251, 191, 36, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.history-item-name {
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.history-item .doc-link {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.2);
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.history-item .doc-link:hover {
+  background: rgba(16, 185, 129, 0.2);
+}
 </style>

@@ -535,3 +535,47 @@ function approveMealPlanServer(approvedMealsWithDates) {
     throw new Error("Failed to execute meal plan workflow: " + e.message);
   }
 }
+
+/**
+ * Reads the "Meal Plan Recipes" folder and extracts the 25 most recently created recipes.
+ */
+function getRecipeHistory() {
+  try {
+    var parentFolder = getOrCreateFolder(PARENT_FOLDER_NAME);
+    var files = parentFolder.getFiles();
+    var history = [];
+    
+    while (files.hasNext()) {
+      var file = files.next();
+      var fileName = file.getName();
+      
+      // Look for recipe filename pattern: YYYYMMDD - Recipe Name
+      var match = fileName.match(/^(\d{8})\s*-\s*(.+)$/);
+      if (match) {
+        var rawDate = match[1];
+        var recipeName = match[2];
+        
+        // Format to YYYY-MM-DD
+        var formattedDate = rawDate.substring(0, 4) + "-" + rawDate.substring(4, 6) + "-" + rawDate.substring(6, 8);
+        
+        history.push({
+          name: recipeName,
+          date: formattedDate,
+          url: file.getUrl(),
+          createdTime: file.getDateCreated().getTime()
+        });
+      }
+    }
+    
+    // Sort by creation date descending
+    history.sort(function(a, b) {
+      return b.createdTime - a.createdTime;
+    });
+    
+    // Return top 25
+    return history.slice(0, 25);
+  } catch (e) {
+    Logger.log("Error loading recipe history: " + e.toString());
+    throw new Error("Failed to load history: " + e.message);
+  }
+}
