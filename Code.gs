@@ -4,7 +4,8 @@
  */
 
 var DB_FILENAME = "Automated_Meal_Planner_DB.json";
-var RECIPES_FOLDER_NAME = "Meal Prep Recipes";
+var PARENT_FOLDER_NAME = "Meal Plan Recipes";
+var SHOPPING_LISTS_FOLDER_NAME = "Shopping Lists";
 
 /**
  * Serves the HTML web page.
@@ -27,9 +28,11 @@ function getDatabaseFile() {
   } else {
     var defaultDb = {
       preferences: {
-        allergies: "Absolutely no eggs",
-        restrictions: "No fish or seafood",
-        inventory: "Prioritize the use of 40 lbs of existing russet potatoes in all recipes"
+        allergies: "No eggs.",
+        dietaryPreferences: "Strong preference for high protein and seasonal vegetables.",
+        onHandIngredients: "",
+        dinersCount: 2,
+        defaultMealTime: "06:00 PM"
       },
       mealPlan: null,
       lastUpdated: new Date().toISOString()
@@ -47,7 +50,39 @@ function loadAppData() {
     var content = file.getBlob().getDataAsString();
     var db = JSON.parse(content);
     
-    // Check if Gemini API key exists in user properties
+    // Schema Migrations if older version DB file exists in user's Drive:
+    var updated = false;
+    if (!db.preferences) {
+      db.preferences = {};
+    }
+    
+    // Migrate 'restrictions' -> 'dietaryPreferences'
+    if (db.preferences.restrictions !== undefined && db.preferences.dietaryPreferences === undefined) {
+      db.preferences.dietaryPreferences = db.preferences.restrictions;
+      delete db.preferences.restrictions;
+      updated = true;
+    }
+    // Migrate 'inventory' -> 'onHandIngredients'
+    if (db.preferences.inventory !== undefined && db.preferences.onHandIngredients === undefined) {
+      db.preferences.onHandIngredients = db.preferences.inventory;
+      delete db.preferences.inventory;
+      updated = true;
+    }
+    // Ensure dinersCount exists
+    if (db.preferences.dinersCount === undefined) {
+      db.preferences.dinersCount = 2;
+      updated = true;
+    }
+    // Ensure defaultMealTime exists
+    if (db.preferences.defaultMealTime === undefined) {
+      db.preferences.defaultMealTime = "06:00 PM";
+      updated = true;
+    }
+    
+    if (updated) {
+      file.setContent(JSON.stringify(db, null, 2));
+    }
+    
     var userProperties = PropertiesService.getUserProperties();
     var apiKey = userProperties.getProperty('GEMINI_API_KEY');
     
@@ -70,7 +105,13 @@ function savePreferences(preferences) {
     var content = file.getBlob().getDataAsString();
     var db = JSON.parse(content);
     
-    db.preferences = preferences;
+    db.preferences = {
+      allergies: preferences.allergies || "",
+      dietaryPreferences: preferences.dietaryPreferences || "",
+      onHandIngredients: preferences.onHandIngredients || "",
+      dinersCount: parseInt(preferences.dinersCount, 10) || 2,
+      defaultMealTime: preferences.defaultMealTime || "06:00 PM"
+    };
     db.lastUpdated = new Date().toISOString();
     
     file.setContent(JSON.stringify(db, null, 2));
@@ -112,8 +153,10 @@ function deleteApiKey() {
 /**
  * Calls the Gemini API to generate a weekly meal plan based on preferences.
  */
-function generateMealPlanServer() {
+function generateMealPlanServer(mealCount) {
   try {
+    mealCount = parseInt(mealCount, 10) || 7;
+    
     var userProperties = PropertiesService.getUserProperties();
     var apiKey = userProperties.getProperty('GEMINI_API_KEY');
     if (!apiKey) {
@@ -125,13 +168,13 @@ function generateMealPlanServer() {
     var prefs = db.preferences;
     
     // Construct the Gemini API Prompt
-    var prompt = "You are a professional chef. Generate a weekly dinner meal plan consisting of exactly 7 dinner recipes. " +
-                 "You MUST strictly follow these dietary constraints:\n" +
+    var prompt = "You are a professional chef. Generate a dinner meal plan consisting of exactly " + mealCount + " dinner recipes. " +
+                 "Scale all ingredient quantities in every recipe to feed exactly " + prefs.dinersCount + " diners.\n" +
+                 "You MUST strictly follow these constraints:\n" +
                  "- Allergy Constraint: " + prefs.allergies + "\n" +
-                 "- Restriction Constraint: " + prefs.restrictions + "\n" +
-                 "- Inventory Constraint: " + prefs.inventory + "\n\n" +
+                 "- Dietary Preferences: " + prefs.dietaryPreferences + "\n" +
+                 (prefs.onHandIngredients ? "- On Hand Ingredients to use: " + prefs.onHandIngredients + "\n\n" : "\n\n") +
                  "Provide a variety of dinner meals. Every recipe must have ingredients, amounts, units, and clear step-by-step instructions. " +
-                 "Since russet potatoes are in abundance, make sure russet potatoes are utilized in creative ways across all recipes. " +
                  "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";
                  
     var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
@@ -152,7 +195,7 @@ function generateMealPlanServer() {
           properties: {
             recipes: {
               type: "ARRAY",
-              description: "A list of 7 dinner recipes satisfying all constraints",
+              description: "A list of " + mealCount + " dinner recipes satisfying all constraints",
               items: {
                 type: "OBJECT",
                 properties: {
@@ -227,6 +270,34 @@ function generateMealPlanServer() {
 }
 
 /**
+ * Parse time supporting AM/PM formats as well as 24-hour.
+ */
+function parseTime(timeStr) {
+  var hours = 18; // default 6 PM
+  var minutes = 0;
+  if (!timeStr) return { hours: hours, minutes: minutes };
+  
+  timeStr = timeStr.trim().toUpperCase();
+  var isPM = timeStr.indexOf('PM') !== -1;
+  var isAM = timeStr.indexOf('AM') !== -1;
+  
+  // Strip out AM/PM
+  var cleanTime = timeStr.replace(/[AP]M/, '').trim();
+  var parts = cleanTime.split(':');
+  if (parts.length >= 2) {
+    hours = parseInt(parts[0], 10);
+    minutes = parseInt(parts[1], 10);
+    
+    if (isPM && hours < 12) {
+      hours += 12;
+    } else if (isAM && hours === 12) {
+      hours = 0;
+    }
+  }
+  return { hours: hours, minutes: minutes };
+}
+
+/**
  * Consolidated shopping list: smart parses and deduplicates ingredients.
  */
 function consolidateShoppingList(recipes) {
@@ -236,13 +307,6 @@ function consolidateShoppingList(recipes) {
       var name = ing.name.toLowerCase().trim();
       var amount = parseFloat(ing.amount);
       var unit = ing.unit.toLowerCase().trim();
-      
-      // Basic singular/plural grouping helper for common words
-      if (name.endsWith('es') && name !== 'potatoes' && name !== 'tomatoes') {
-        // e.g. olives -> olive (don't overdo, just light cleanup)
-      } else if (name.endsWith('s') && !name.endsWith('ss') && !name.endsWith('ch') && !name.endsWith('sh') && !name.endsWith('x') && name !== 'russet potatoes') {
-        // e.g. onions -> onion
-      }
       
       if (!list[name]) {
         list[name] = [];
@@ -285,7 +349,7 @@ function consolidateShoppingList(recipes) {
 }
 
 /**
- * Gets or creates a specific folder in Google Drive.
+ * Gets or creates a specific root-level folder in Google Drive.
  */
 function getOrCreateFolder(folderName) {
   var folders = DriveApp.getFoldersByName(folderName);
@@ -297,20 +361,46 @@ function getOrCreateFolder(folderName) {
 }
 
 /**
- * Approves the meal plan and runs the workspace execution workflow.
+ * Gets or creates a subfolder inside a parent folder.
  */
-function approveMealPlanServer(approvedRecipes) {
+function getOrCreateSubfolder(parentFolder, subfolderName) {
+  var subfolders = parentFolder.getFoldersByName(subfolderName);
+  if (subfolders.hasNext()) {
+    return subfolders.next();
+  } else {
+    return parentFolder.createFolder(subfolderName);
+  }
+}
+
+/**
+ * Approves the meal plan and runs the workspace execution workflow.
+ * @param {Array<Object>} approvedMealsWithDates Array of { name: String, date: String } (where date is "YYYY-MM-DD")
+ */
+function approveMealPlanServer(approvedMealsWithDates) {
   try {
     var file = getDatabaseFile();
     var db = JSON.parse(file.getBlob().getDataAsString());
+    var prefs = db.preferences;
     
     if (!db.mealPlan) {
       throw new Error("No active meal plan found to approve.");
     }
     
-    // Filter the recipes to only the approved ones (if user deselected any)
-    var selectedRecipes = db.mealPlan.recipes.filter(function(recipe) {
-      return approvedRecipes.indexOf(recipe.name) !== -1;
+    // Map approved meals names to check quickly
+    var approvedMap = {};
+    approvedMealsWithDates.forEach(function(item) {
+      approvedMap[item.name] = item.date;
+    });
+    
+    // Filter active recipes to only the approved ones and map dates
+    var selectedRecipes = [];
+    db.mealPlan.recipes.forEach(function(recipe) {
+      if (approvedMap[recipe.name]) {
+        selectedRecipes.push({
+          recipe: recipe,
+          dateVal: approvedMap[recipe.name] // YYYY-MM-DD
+        });
+      }
     });
     
     if (selectedRecipes.length === 0) {
@@ -323,22 +413,26 @@ function approveMealPlanServer(approvedRecipes) {
       calendarEventsCreated: 0
     };
     
-    var recipesFolder = getOrCreateFolder(RECIPES_FOLDER_NAME);
+    // Create folders
+    var parentFolder = getOrCreateFolder(PARENT_FOLDER_NAME);
+    var shoppingListFolder = getOrCreateSubfolder(parentFolder, SHOPPING_LISTS_FOLDER_NAME);
     var calendar = CalendarApp.getDefaultCalendar();
     
-    // Day counter for calendar events (start scheduling starting from tomorrow)
-    var today = new Date();
-    
     // 1. Create individual Google Docs for each recipe & Calendar events
-    selectedRecipes.forEach(function(recipe, index) {
-      // Create Doc
-      var docName = "Recipe: " + recipe.name;
+    selectedRecipes.forEach(function(item) {
+      var recipe = item.recipe;
+      var dateVal = item.dateVal; // YYYY-MM-DD
+      var dateCompact = dateVal.replace(/-/g, ''); // YYYYMMDD
+      
+      // Create Doc named "YYYYMMDD - Recipe Name"
+      var docName = dateCompact + " - " + recipe.name;
       var doc = DocumentApp.create(docName);
       var body = doc.getBody();
       
       body.appendParagraph(recipe.name).setHeading(DocumentApp.ParagraphHeading.HEADING1);
       body.appendParagraph(recipe.description).setItalic(true);
-      body.appendParagraph("Prep Time: " + recipe.prepTime + " | Cook Time: " + recipe.cookTime);
+      body.appendParagraph("Date Scheduled: " + dateVal + " | Prep Time: " + recipe.prepTime + " | Cook Time: " + recipe.cookTime);
+      body.appendParagraph("Diners Scaled For: " + prefs.dinersCount).setBold(true);
       
       body.appendParagraph("Ingredients").setHeading(DocumentApp.ParagraphHeading.HEADING2);
       recipe.ingredients.forEach(function(ing) {
@@ -352,26 +446,33 @@ function approveMealPlanServer(approvedRecipes) {
       
       doc.saveAndClose();
       
-      // Move to Recipes Folder
+      // Move to Parent Folder
       var docFile = DriveApp.getFileById(doc.getId());
-      docFile.moveTo(recipesFolder);
+      docFile.moveTo(parentFolder);
       
       var docUrl = doc.getUrl();
       executionResult.recipeDocs.push({
         name: recipe.name,
+        date: dateVal,
         url: docUrl
       });
       
       // Create Google Calendar Event
-      var eventDate = new Date(today.getTime());
-      eventDate.setDate(today.getDate() + index + 1); // Starting tomorrow, consecutive days
+      // Parse YYYY-MM-DD
+      var dateParts = dateVal.split('-');
+      var year = parseInt(dateParts[0], 10);
+      var month = parseInt(dateParts[1], 10) - 1; // 0-indexed month
+      var day = parseInt(dateParts[2], 10);
       
-      // Set to 6:00 PM - 7:00 PM for dinner prep
-      var startTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), 18, 0, 0);
-      var endTime = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate(), 19, 0, 0);
+      // Parse Default daily prep time from preferences (e.g. "06:00 PM" or "18:00")
+      var timeDetails = parseTime(prefs.defaultMealTime);
+      
+      var startTime = new Date(year, month, day, timeDetails.hours, timeDetails.minutes, 0);
+      var endTime = new Date(year, month, day, timeDetails.hours + 1, timeDetails.minutes, 0);
       
       var description = "Prep & Cook: " + recipe.name + "\n\n" +
                         recipe.description + "\n\n" +
+                        "Diners: " + prefs.dinersCount + "\n" +
                         "Prep Time: " + recipe.prepTime + " | Cook Time: " + recipe.cookTime + "\n\n" +
                         "Ingredients:\n" +
                         recipe.ingredients.map(function(i) { return "- " + i.amount + " " + i.unit + " " + i.name; }).join("\n") + "\n\n" +
@@ -386,14 +487,26 @@ function approveMealPlanServer(approvedRecipes) {
       executionResult.calendarEventsCreated++;
     });
     
-    // 2. Generate Consolidated Deduplicated Shopping List
-    var consolidatedList = consolidateShoppingList(selectedRecipes);
-    var shoppingListDoc = DocumentApp.create("Consolidated Shopping List - " + Utilities.formatDate(today, Session.getScriptTimeZone(), "yyyy-MM-dd"));
+    // 2. Generate Consolidated Shopping List
+    // Get raw recipes
+    var rawSelectedRecipes = selectedRecipes.map(function(item) { return item.recipe; });
+    var consolidatedList = consolidateShoppingList(rawSelectedRecipes);
+    
+    // Find the earliest date among all approved meals to name the shopping list
+    // approvedMealsWithDates is [{name, date}]
+    var dates = approvedMealsWithDates.map(function(item) { return item.date; });
+    dates.sort(); // Sorts strings alphabetically, which works for YYYY-MM-DD
+    var earliestDateVal = dates[0] || new Date().toISOString().substring(0, 10);
+    var earliestDateCompact = earliestDateVal.replace(/-/g, '');
+    
+    var shoppingListDocName = earliestDateCompact + " - Shopping List";
+    var shoppingListDoc = DocumentApp.create(shoppingListDocName);
     var slBody = shoppingListDoc.getBody();
     
     slBody.appendParagraph("Consolidated Weekly Shopping List").setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    slBody.appendParagraph("Generated on: " + today.toDateString()).setItalic(true);
-    slBody.appendParagraph("Recipes included: " + selectedRecipes.map(function(r) { return r.name; }).join(", "));
+    slBody.appendParagraph("Scheduled Start Date: " + earliestDateVal).setItalic(true);
+    slBody.appendParagraph("Diners Scaled For: " + prefs.dinersCount).setBold(true);
+    slBody.appendParagraph("Recipes included: " + rawSelectedRecipes.map(function(r) { return r.name; }).join(", "));
     
     slBody.appendParagraph("Items to Buy").setHeading(DocumentApp.ParagraphHeading.HEADING2);
     consolidatedList.forEach(function(item) {
@@ -403,11 +516,12 @@ function approveMealPlanServer(approvedRecipes) {
     
     shoppingListDoc.saveAndClose();
     
-    // Move to Recipes Folder as well
+    // Move to Subfolder "Shopping Lists"
     var slFile = DriveApp.getFileById(shoppingListDoc.getId());
-    slFile.moveTo(recipesFolder);
+    slFile.moveTo(shoppingListFolder);
     
     executionResult.shoppingListDocUrl = shoppingListDoc.getUrl();
+    executionResult.shoppingListDocName = shoppingListDocName;
     
     // Save state back to DB
     db.mealPlan.approved = true;

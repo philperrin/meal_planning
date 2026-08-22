@@ -23,14 +23,17 @@ const els = {
   
   // Preferences Inputs
   prefAllergies: document.getElementById('pref-allergies'),
-  prefRestrictions: document.getElementById('pref-restrictions'),
-  prefInventory: document.getElementById('pref-inventory'),
+  prefDietaryPreferences: document.getElementById('pref-dietary-preferences'),
+  prefOnHand: document.getElementById('pref-on-hand'),
+  prefDiners: document.getElementById('pref-diners'),
+  prefMealTime: document.getElementById('pref-meal-time'),
   
   // Settings Inputs
   apiKeyInput: document.getElementById('api-key-input'),
   apiBadge: document.getElementById('api-badge'),
   
-  // Planner Containers
+  // Planner Inputs
+  mealCountInput: document.getElementById('meal-count-input'),
   plannerContainer: document.getElementById('planner-container')
 };
 
@@ -84,8 +87,10 @@ function onInitialDataLoaded(data) {
   // Populate Preferences Form
   const prefs = appState.db.preferences || {};
   els.prefAllergies.value = prefs.allergies || "";
-  els.prefRestrictions.value = prefs.restrictions || "";
-  els.prefInventory.value = prefs.inventory || "";
+  els.prefDietaryPreferences.value = prefs.dietaryPreferences || "";
+  els.prefOnHand.value = prefs.onHandIngredients || "";
+  els.prefDiners.value = prefs.dinersCount || 2;
+  els.prefMealTime.value = prefs.defaultMealTime || "06:00 PM";
   
   // Update API Badge
   updateApiBadge();
@@ -117,8 +122,10 @@ function updateApiBadge() {
 function handleSavePreferences() {
   const prefs = {
     allergies: els.prefAllergies.value.trim(),
-    restrictions: els.prefRestrictions.value.trim(),
-    inventory: els.prefInventory.value.trim()
+    dietaryPreferences: els.prefDietaryPreferences.value.trim(),
+    onHandIngredients: els.prefOnHand.value.trim(),
+    dinersCount: parseInt(els.prefDiners.value, 10) || 2,
+    defaultMealTime: els.prefMealTime.value.trim()
   };
   
   showLoader("Saving preferences...", "Updating your database in Google Drive");
@@ -192,20 +199,39 @@ function handleGenerateMealPlan() {
     return;
   }
   
-  showLoader("Calling Gemini AI...", "Generating 7 delicious potato-rich dinner recipes without eggs or seafood. This takes about 10-15 seconds.");
+  const count = parseInt(els.mealCountInput.value, 10) || 7;
+  showLoader("Calling Gemini AI...", "Generating " + count + " dinner recipes. Scaling ingredients for " + (els.prefDiners.value || 2) + " diners. This takes about 10-15 seconds.");
   
   google.script.run
     .withSuccessHandler(res => {
       hideLoader();
       appState.db = res.db;
       renderMealPlan();
-      showToast("Weekly dinner plan generated successfully!");
+      showToast("Meal plan generated successfully!");
     })
     .withFailureHandler(err => {
       hideLoader();
       showToast("Generation failed: " + err.message, true);
     })
-    .generateMealPlanServer();
+    .generateMealPlanServer(count);
+}
+
+/**
+ * Calculate the next upcoming Sunday and increment daily offsets.
+ */
+function getNextSundayDateString(offsetDays = 0) {
+  const d = new Date();
+  const day = d.getDay();
+  // Calculate steps to Sunday. If today is Sunday (0), next Sunday is in 7 days
+  let steps = 7 - day;
+  if (steps === 0) steps = 7;
+  
+  d.setDate(d.getDate() + steps + offsetDays);
+  
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /**
@@ -219,8 +245,7 @@ function renderMealPlan() {
       <div class="empty-state">
         <div class="empty-state-icon">🍽️</div>
         <h3>No Meal Plan Generated Yet</h3>
-        <p>Define your dietary preferences in the Preferences tab, make sure your Gemini API key is configured, and generate a new weekly dinner plan.</p>
-        <button class="btn" onclick="handleGenerateMealPlan()"><i class="brand-icon" style="font-size:16px;">✦</i> Generate Dinner Plan</button>
+        <p>Choose the number of meals to generate above and click Generate Dinner Plan to begin.</p>
       </div>
     `;
     return;
@@ -257,9 +282,9 @@ function renderMealPlan() {
       <div class="success-box">
         <div class="success-icon">🎉</div>
         <h4 class="success-title">Plan successfully synced!</h4>
-        <p class="success-desc">Individual recipe instructions have been uploaded to Google Drive, dinner prep events have been added to your Default Google Calendar, and a consolidated shopping list document has been compiled.</p>
+        <p class="success-desc">Individual recipe instructions have been uploaded to your Google Drive, dinner prep events have been added to your Default Google Calendar, and a consolidated shopping list document has been compiled.</p>
         <div class="success-links">
-          <a href="${res.shoppingListDocUrl}" target="_blank" class="doc-link">🛒 Open Shopping List</a>
+          <a href="${res.shoppingListDocUrl}" target="_blank" class="doc-link">🛒 Open Shopping List (${res.shoppingListDocName})</a>
           <a href="https://calendar.google.com" target="_blank" class="doc-link">📅 Open Google Calendar</a>
         </div>
       </div>
@@ -268,7 +293,7 @@ function renderMealPlan() {
       <div class="success-links" style="justify-content: flex-start; margin-bottom: 32px;">
     `;
     res.recipeDocs.forEach(doc => {
-      html += `<a href="${doc.url}" target="_blank" class="doc-link">📄 ${doc.name}</a>`;
+      html += `<a href="${doc.url}" target="_blank" class="doc-link">📄 [${doc.date}] ${doc.name}</a>`;
     });
     html += `</div>`;
   }
@@ -279,6 +304,17 @@ function renderMealPlan() {
   plan.recipes.forEach((recipe, idx) => {
     // Add to initial selection set
     appState.selectedRecipes.add(recipe.name);
+    
+    // Default scheduled date logic
+    let defaultDate = getNextSundayDateString(idx);
+    
+    // Find if date was already saved in execution results
+    if (plan.approved && plan.executionResult && plan.executionResult.recipeDocs) {
+      const match = plan.executionResult.recipeDocs.find(d => d.name === recipe.name);
+      if (match) {
+        defaultDate = match.date;
+      }
+    }
     
     // Build recipe details list
     const ingredientsList = recipe.ingredients.map(ing => `<li>${ing.amount} ${ing.unit} ${ing.name}</li>`).join('');
@@ -292,6 +328,14 @@ function renderMealPlan() {
         </div>
         
         <div class="recipe-desc">${recipe.description}</div>
+        
+        <div class="recipe-date-container" onclick="event.stopPropagation()">
+          <span class="recipe-date-label">Schedule Prep:</span>
+          ${plan.approved 
+            ? `<span style="font-size: 13px; font-weight:600; color:var(--accent-secondary);">${defaultDate}</span>` 
+            : `<input type="date" class="recipe-date-input" id="date-${idx}" value="${defaultDate}">`
+          }
+        </div>
         
         <div class="recipe-meta-row">
           <div class="recipe-meta-item">⏱️ Prep: ${recipe.prepTime}</div>
@@ -374,13 +418,28 @@ function toggleDetails(idx) {
  * Executes approved meal plan
  */
 function handleExecutePlan() {
-  const approvedList = Array.from(appState.selectedRecipes);
+  const plan = appState.db.mealPlan;
+  if (!plan) return;
+  
+  // Gather approved recipe name and date mappings
+  const approvedList = [];
+  plan.recipes.forEach((recipe, idx) => {
+    if (appState.selectedRecipes.has(recipe.name)) {
+      const dateEl = document.getElementById(`date-${idx}`);
+      const dateVal = dateEl ? dateEl.value : getNextSundayDateString(idx);
+      approvedList.push({
+        name: recipe.name,
+        date: dateVal
+      });
+    }
+  });
+  
   if (approvedList.length === 0) {
     showToast("Please approve at least one recipe before executing.", true);
     return;
   }
   
-  showLoader("Executing Workflow...", "Generating Google Docs for each recipe, scheduling calendar prep events, and compiling consolidated shopping list. This takes a moment.");
+  showLoader("Executing Workflow...", "Generating Google Docs for each recipe, scheduling calendar events, and compiling consolidated shopping list inside the folders in your Google Drive.");
   
   google.script.run
     .withSuccessHandler(res => {
