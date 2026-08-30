@@ -7,27 +7,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-card: rgba(30, 41, 59, 0.7);
-  --border-card: rgba(255, 255, 255, 0.06);
-  --border-card-hover: rgba(16, 185, 129, 0.4);
+  --bg-primary: #1c1e15; /* Deep organic olive-black */
+  --bg-secondary: #272a1e; /* Dark forest green */
+  --bg-card: rgba(39, 42, 30, 0.75); /* Muted dark green glass */
+  --border-card: rgba(237, 224, 212, 0.08); /* Warm cream border */
+  --border-card-hover: rgba(101, 109, 74, 0.5); /* Sage green hover border */
   
-  --text-primary: #f8fafc;
-  --text-secondary: #cbd5e1;
-  --text-muted: #64748b;
+  --text-primary: #ede0d4; /* Warm cream */
+  --text-secondary: #dcd1c5; /* Soft tan/cream */
+  --text-muted: #8e957e; /* Muted sage */
   
-  --accent-primary: #10b981; /* Emerald/Herb */
-  --accent-primary-hover: #059669;
-  --accent-secondary: #fbbf24; /* Potato Gold */
-  --accent-secondary-hover: #f59e0b;
+  --accent-primary: #656d4a; /* Sage green */
+  --accent-primary-hover: #4f5539; /* Darker sage green */
+  --accent-secondary: #A68A64; /* Warm golden tan */
+  --accent-secondary-hover: #7F5539; /* Warm brown */
   
-  --error: #ef4444;
-  --success: #10b981;
+  --error: #cf5c5c; /* Soft red */
+  --success: #656d4a; /* Sage success */
   
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.15);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
   
   --font-sans: 'Outfit', sans-serif;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -52,8 +52,8 @@ body {
   flex-direction: column;
   overflow-x: hidden;
   background-image: 
-    radial-gradient(circle at 10% 20%, rgba(16, 185, 129, 0.05) 0%, transparent 40%),
-    radial-gradient(circle at 90% 80%, rgba(251, 191, 36, 0.03) 0%, transparent 45%);
+    radial-gradient(circle at 10% 20%, rgba(101, 109, 74, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(166, 138, 100, 0.05) 0%, transparent 45%);
 }
 
 /* App Container */
@@ -129,9 +129,9 @@ nav {
 }
 
 .nav-tab.active {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(101, 109, 74, 0.15);
   color: var(--accent-primary);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  border: 1px solid rgba(101, 109, 74, 0.2);
 }
 
 /* Main Content Area */
@@ -205,7 +205,7 @@ label {
 
 input[type="text"], textarea {
   width: 100%;
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(28, 30, 21, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-sm);
   padding: 12px 16px;
@@ -218,8 +218,8 @@ input[type="text"], textarea {
 input[type="text"]:focus, textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
-  background: rgba(15, 23, 42, 0.8);
+  box-shadow: 0 0 0 3px rgba(101, 109, 74, 0.2);
+  background: rgba(28, 30, 21, 0.8);
 }
 
 textarea {
@@ -242,12 +242,12 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 4px 12px rgba(101, 109, 74, 0.25);
 }
 
 .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.35);
+  box-shadow: 0 6px 20px rgba(101, 109, 74, 0.4);
 }
 
 .btn:active {
@@ -280,12 +280,12 @@ textarea {
 
 .btn-gold {
   background: linear-gradient(135deg, var(--accent-secondary) 0%, var(--accent-secondary-hover) 100%);
-  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2);
-  color: #121824;
+  box-shadow: 0 4px 12px rgba(166, 138, 100, 0.2);
+  color: #fff;
 }
 
 .btn-gold:hover {
-  box-shadow: 0 6px 20px rgba(251, 191, 36, 0.35);
+  box-shadow: 0 6px 20px rgba(166, 138, 100, 0.35);
 }
 
 .btn-disabled {
@@ -312,7 +312,7 @@ textarea {
 .loader {
   width: 64px;
   height: 64px;
-  border: 5px solid rgba(16, 185, 129, 0.1);
+  border: 5px solid rgba(101, 109, 74, 0.1);
   border-radius: 50%;
   border-top-color: var(--accent-primary);
   animation: spin 1s linear infinite;
@@ -441,7 +441,7 @@ textarea {
   justify-content: center;
   cursor: pointer;
   transition: var(--transition);
-  background: rgba(15, 23, 42, 0.4);
+  background: rgba(28, 30, 21, 0.4);
   flex-shrink: 0;
 }
 
@@ -496,7 +496,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background: rgba(15, 23, 42, 0.3);
+  background: rgba(28, 30, 21, 0.3);
   padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.04);
@@ -511,7 +511,7 @@ textarea {
 }
 
 .recipe-date-input {
-  background: rgba(15, 23, 42, 0.6);
+  background: rgba(28, 30, 21, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   padding: 4px 8px;
@@ -594,8 +594,8 @@ textarea {
 
 /* Success Execution Box */
 .success-box {
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(101, 109, 74, 0.08);
+  border: 1px solid rgba(101, 109, 74, 0.2);
   border-radius: var(--radius-lg);
   padding: 32px;
   text-align: center;
@@ -645,8 +645,8 @@ textarea {
 }
 
 .doc-link:hover {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(101, 109, 74, 0.15);
+  border-color: rgba(101, 109, 74, 0.3);
   transform: translateY(-2px);
 }
 
@@ -688,7 +688,7 @@ textarea {
 }
 
 .api-badge.active {
-  background: rgba(16, 185, 129, 0.15);
+  background: rgba(101, 109, 74, 0.15);
   color: var(--accent-primary);
 }
 
@@ -702,7 +702,7 @@ textarea {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: #1e293b;
+  background: var(--bg-secondary);
   border-left: 4px solid var(--accent-primary);
   border-radius: var(--radius-sm);
   padding: 12px 24px;
@@ -776,7 +776,7 @@ textarea {
 
 .history-item:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(16, 185, 129, 0.2);
+  border-color: rgba(101, 109, 74, 0.25);
   transform: translateX(4px);
 }
 
@@ -804,13 +804,13 @@ textarea {
 }
 
 .history-item .doc-link {
-  background: rgba(16, 185, 129, 0.1);
-  border-color: rgba(16, 185, 129, 0.2);
+  background: rgba(101, 109, 74, 0.1);
+  border-color: rgba(101, 109, 74, 0.2);
   padding: 8px 14px;
   font-size: 12px;
 }
 
 .history-item .doc-link:hover {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(101, 109, 74, 0.2);
 }
 </style>

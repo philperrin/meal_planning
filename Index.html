@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <base target="_top">
   <!-- Include Premium CSS Stylesheet -->
   <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
 </head>
+
 <body>
 
   <div class="app-container">
@@ -24,7 +26,7 @@
 
     <!-- Main Content Views -->
     <main>
-      
+
       <!-- LOADING SCREEN OVERLAY -->
       <div class="loading-overlay" id="loader">
         <div class="loader"></div>
@@ -37,10 +39,14 @@
         <div class="panel" style="margin-bottom: 24px; padding: 20px 24px;">
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
             <div style="display: flex; align-items: center; gap: 12px;">
-              <label for="meal-count-input" style="margin-bottom: 0; font-size: 14px; text-transform: none; letter-spacing: 0;">Number of dinners to generate:</label>
-              <input type="number" id="meal-count-input" min="1" max="14" value="7" style="width: 70px; padding: 8px 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 14px;">
+              <label for="meal-count-input"
+                style="margin-bottom: 0; font-size: 14px; text-transform: none; letter-spacing: 0;">Number of dinners to
+                generate:</label>
+              <input type="number" id="meal-count-input" min="1" max="14" value="4"
+                style="width: 70px; padding: 8px 12px; background: rgba(28, 30, 21, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 14px;">
             </div>
-            <button class="btn" onclick="handleGenerateMealPlan()"><i class="brand-icon" style="font-size:16px;">✦</i> Generate Dinner Plan</button>
+            <button class="btn" onclick="handleGenerateMealPlan()"><i class="brand-icon" style="font-size:16px;">✦</i>
+              Generate Dinner Plan</button>
           </div>
         </div>
         <div id="planner-container">
@@ -53,7 +59,8 @@
         <div class="panel">
           <h2 class="panel-title">📜 Recipe History</h2>
           <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
-            Below are the 25 most recently created recipes from your <strong>Meal Plan Recipes</strong> folder in Google Drive.
+            Below are the 25 most recently created recipes from your <strong>Meal Plan Recipes</strong> folder in Google
+            Drive.
           </p>
           <div id="history-container">
             <!-- Dynamic history items list is rendered here -->
@@ -65,40 +72,44 @@
       <div class="view" id="preferences-view">
         <div class="panel">
           <h2 class="panel-title">🍽️ Dietary Preferences & Inventory</h2>
-          
+
           <div class="form-group">
             <label for="pref-allergies">Dietary Allergy Constraints</label>
             <div class="input-desc">Specify any ingredients to strictly avoid due to allergies.</div>
             <textarea id="pref-allergies" placeholder="e.g., No eggs..."></textarea>
           </div>
-          
+
           <div class="form-group">
             <label for="pref-dietary-preferences">Dietary Preferences</label>
             <div class="input-desc">Specify general dietary choices, themes, or preferences.</div>
-            <textarea id="pref-dietary-preferences" placeholder="e.g., Strong preference for high protein and seasonal vegetables..."></textarea>
+            <textarea id="pref-dietary-preferences"
+              placeholder="e.g., Strong preference for high protein and seasonal vegetables..."></textarea>
           </div>
-          
+
           <div class="form-group">
             <label for="pref-on-hand">On Hand Ingredients To Use</label>
             <div class="input-desc">Highlight ingredients that you have on hand and wish to prioritize.</div>
             <textarea id="pref-on-hand" placeholder="e.g., Potatoes, onions, chicken breast..."></textarea>
           </div>
-          
+
           <!-- Diner Count and daily prep time row -->
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-top: 12px;">
+          <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; margin-top: 12px;">
             <div class="form-group">
               <label for="pref-diners">Number of Diners (Quantity)</label>
               <div class="input-desc">Number of expected diners for scaling ingredients.</div>
-              <input type="number" id="pref-diners" min="1" max="100" value="2" style="width: 100px; padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 15px;">
+              <input type="number" id="pref-diners" min="1" max="100" value="2"
+                style="width: 100px; padding: 10px 14px; background: rgba(28, 30, 21, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 15px;">
             </div>
 
             <div class="form-group">
               <label for="pref-meal-time">Default Daily Prep Time</label>
               <div class="input-desc">Specify default time for calendar events (AM/PM).</div>
-              <input type="text" id="pref-meal-time" placeholder="e.g., 06:00 PM" style="width: 150px; padding: 10px 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 15px;">
+              <input type="text" id="pref-meal-time" placeholder="e.g., 06:00 PM"
+                style="width: 150px; padding: 10px 14px; background: rgba(28, 30, 21, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-sans); font-size: 15px;">
             </div>
           </div>
-          
+
           <div style="margin-top: 24px;">
             <button class="btn" onclick="handleSavePreferences()">💾 Save Preferences</button>
           </div>
@@ -109,36 +120,39 @@
       <div class="view" id="settings-view">
         <div class="panel">
           <h2 class="panel-title">🔑 Configuration & API Keys</h2>
-          
+
           <div class="form-group">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
               <label style="margin-bottom:0;">Gemini API Key</label>
               <div id="api-badge" class="api-badge missing">• Checking status...</div>
             </div>
-            <div class="input-desc">Required to authenticate and run the Gemini AI generation models. Saved in Apps Script User Properties (private to you).</div>
+            <div class="input-desc">Required to authenticate and run the Gemini AI generation models. Saved in Apps
+              Script User Properties (private to you).</div>
             <input type="text" id="api-key-input" placeholder="Paste your AIzaSy... key here">
           </div>
-          
+
           <div style="display: flex; gap: 12px; margin-top: 24px;">
             <button class="btn" onclick="handleSaveApiKey()">🔑 Save API Key</button>
             <button class="btn btn-secondary btn-danger" onclick="handleDeleteApiKey()">❌ Clear API Key</button>
           </div>
         </div>
-        
+
         <div class="panel">
           <h3 class="panel-title" style="font-size: 16px; margin-bottom: 12px;">ℹ️ App Deployment & Information</h3>
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
-            This system runs entirely serverless within your Google Account. 
-            All recipe details and meal history are saved securely in your Google Drive inside the file 
+            This system runs entirely serverless within your Google Account.
+            All recipe details and meal history are saved securely in your Google Drive inside the file
             <strong style="color:var(--accent-secondary);">Automated_Meal_Planner_DB.json</strong>.
           </p>
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
             Upon meal plan approval, the assistant will automatically generate:
           </p>
-          <ul style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
+          <ul
+            style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
             <li>Google Docs for individual recipes inside a folder called <strong>Meal Plan Recipes</strong>.</li>
             <li>Prep & cook events scheduled on your default Google Calendar at your configured daily prep time.</li>
-            <li>A single consolidated, smart-merged shopping list Google Doc placed in a subfolder called <strong>Shopping Lists</strong>.</li>
+            <li>A single consolidated, smart-merged shopping list Google Doc placed in a subfolder called
+              <strong>Shopping Lists</strong>.</li>
           </ul>
         </div>
       </div>
@@ -154,4 +168,5 @@
   <!-- Include Client-Side JS -->
   <?!= HtmlService.createHtmlOutputFromFile('JavaScript').getContent(); ?>
 </body>
+
 </html>
