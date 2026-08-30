@@ -1,271 +1,271 @@
 <script>
-/**
- * Automated Meal Planning Assistant - Client-side JS
- * Handles UI transitions, dynamic content rendering, card actions, and server calls.
- */
+  /**
+   * Automated Meal Planning Assistant - Client-side JS
+   * Handles UI transitions, dynamic content rendering, card actions, and server calls.
+   */
 
-// Application State
-let appState = {
-  db: {
-    preferences: {},
-    mealPlan: null
-  },
-  hasApiKey: false,
-  selectedRecipes: new Set()
-};
-
-// UI Elements
-const els = {
-  tabs: document.querySelectorAll('.nav-tab'),
-  views: document.querySelectorAll('.view'),
-  loader: document.getElementById('loader'),
-  toast: document.getElementById('toast'),
-  
-  // Preferences Inputs
-  prefAllergies: document.getElementById('pref-allergies'),
-  prefDietaryPreferences: document.getElementById('pref-dietary-preferences'),
-  prefOnHand: document.getElementById('pref-on-hand'),
-  prefDiners: document.getElementById('pref-diners'),
-  prefMealTime: document.getElementById('pref-meal-time'),
-  
-  // Settings Inputs
-  apiKeyInput: document.getElementById('api-key-input'),
-  apiBadge: document.getElementById('api-badge'),
-  
-  // Planner Inputs
-  mealCountInput: document.getElementById('meal-count-input'),
-  plannerContainer: document.getElementById('planner-container'),
-  
-  // History Container
-  historyContainer: document.getElementById('history-container')
-};
-
-// Initialize App
-document.addEventListener('DOMContentLoaded', () => {
-  setupNavigation();
-  loadInitialData();
-});
-
-/**
- * Setup Navigation Event Listeners
- */
-function setupNavigation() {
-  els.tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const targetView = tab.getAttribute('data-view');
-      switchView(targetView);
-    });
-  });
-}
-
-function switchView(viewId) {
-  // Update Tabs
-  els.tabs.forEach(t => t.classList.remove('active'));
-  const targetTab = document.querySelector(`.nav-tab[data-view="${viewId}"]`);
-  if (targetTab) targetTab.classList.add('active');
-  
-  // Update Views
-  els.views.forEach(v => v.classList.remove('active'));
-  const targetView = document.getElementById(`${viewId}-view`);
-  if (targetView) targetView.classList.add('active');
-  
-  // Fetch history if the tab is selected
-  if (viewId === 'history') {
-    loadHistoryData();
-  }
-}
-
-/**
- * Load initial data from Drive and User Properties
- */
-function loadInitialData() {
-  showLoader("Loading configuration...", "Retrieving your data from Google Drive");
-  google.script.run
-    .withSuccessHandler(onInitialDataLoaded)
-    .withFailureHandler(err => {
-      hideLoader();
-      showToast("Failed to load initial data: " + err.message, true);
-    })
-    .loadAppData();
-}
-
-function onInitialDataLoaded(data) {
-  hideLoader();
-  appState.db = data.db;
-  appState.hasApiKey = data.hasApiKey;
-  
-  // Populate Preferences Form
-  const prefs = appState.db.preferences || {};
-  els.prefAllergies.value = prefs.allergies || "";
-  els.prefDietaryPreferences.value = prefs.dietaryPreferences || "";
-  els.prefOnHand.value = prefs.onHandIngredients || "";
-  els.prefDiners.value = prefs.dinersCount || 2;
-  els.prefMealTime.value = prefs.defaultMealTime || "06:00 PM";
-  
-  // Update API Badge
-  updateApiBadge();
-  
-  // Render Meal Plan
-  renderMealPlan();
-}
-
-/**
- * Update the Gemini API status badge
- */
-function updateApiBadge() {
-  if (appState.hasApiKey) {
-    els.apiBadge.className = "api-badge active";
-    els.apiBadge.innerHTML = "• API Key Saved";
-    els.apiKeyInput.placeholder = "••••••••••••••••••••••••••••••••";
-    els.apiKeyInput.value = "";
-  } else {
-    els.apiBadge.className = "api-badge missing";
-    els.apiBadge.innerHTML = "• API Key Missing";
-    els.apiKeyInput.placeholder = "Enter your Gemini API key...";
-    els.apiKeyInput.value = "";
-  }
-}
-
-/**
- * Save Preferences to Drive
- */
-function handleSavePreferences() {
-  const prefs = {
-    allergies: els.prefAllergies.value.trim(),
-    dietaryPreferences: els.prefDietaryPreferences.value.trim(),
-    onHandIngredients: els.prefOnHand.value.trim(),
-    dinersCount: parseInt(els.prefDiners.value, 10) || 2,
-    defaultMealTime: els.prefMealTime.value.trim()
+  // Application State
+  let appState = {
+    db: {
+      preferences: {},
+      mealPlan: null
+    },
+    hasApiKey: false,
+    selectedRecipes: new Set()
   };
-  
-  showLoader("Saving preferences...", "Updating your database in Google Drive");
-  
-  google.script.run
-    .withSuccessHandler(data => {
-      hideLoader();
-      appState.db = data.db;
-      showToast("Preferences saved successfully!");
-    })
-    .withFailureHandler(err => {
-      hideLoader();
-      showToast("Failed to save preferences: " + err.message, true);
-    })
-    .savePreferences(prefs);
-}
 
-/**
- * Save API Key to PropertiesService
- */
-function handleSaveApiKey() {
-  const key = els.apiKeyInput.value.trim();
-  if (!key) {
-    showToast("Please enter a valid API key.", true);
-    return;
+  // UI Elements
+  const els = {
+    tabs: document.querySelectorAll('.nav-tab'),
+    views: document.querySelectorAll('.view'),
+    loader: document.getElementById('loader'),
+    toast: document.getElementById('toast'),
+
+    // Preferences Inputs
+    prefAllergies: document.getElementById('pref-allergies'),
+    prefDietaryPreferences: document.getElementById('pref-dietary-preferences'),
+    prefOnHand: document.getElementById('pref-on-hand'),
+    prefDiners: document.getElementById('pref-diners'),
+    prefMealTime: document.getElementById('pref-meal-time'),
+
+    // Settings Inputs
+    apiKeyInput: document.getElementById('api-key-input'),
+    apiBadge: document.getElementById('api-badge'),
+
+    // Planner Inputs
+    mealCountInput: document.getElementById('meal-count-input'),
+    plannerContainer: document.getElementById('planner-container'),
+
+    // History Container
+    historyContainer: document.getElementById('history-container')
+  };
+
+  // Initialize App
+  document.addEventListener('DOMContentLoaded', () => {
+    setupNavigation();
+    loadInitialData();
+  });
+
+  /**
+   * Setup Navigation Event Listeners
+   */
+  function setupNavigation() {
+    els.tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const targetView = tab.getAttribute('data-view');
+        switchView(targetView);
+      });
+    });
   }
-  
-  showLoader("Saving API key...", "Storing credentials securely in Google Apps Script");
-  
-  google.script.run
-    .withSuccessHandler(res => {
-      hideLoader();
-      appState.hasApiKey = true;
-      updateApiBadge();
-      showToast("Gemini API key saved securely!");
-    })
-    .withFailureHandler(err => {
-      hideLoader();
-      showToast("Failed to save API Key: " + err.message, true);
-    })
-    .saveApiKey(key);
-}
 
-/**
- * Delete API Key from PropertiesService
- */
-function handleDeleteApiKey() {
-  showLoader("Clearing API key...", "Removing credentials from Google Apps Script");
-  
-  google.script.run
-    .withSuccessHandler(res => {
-      hideLoader();
-      appState.hasApiKey = false;
-      updateApiBadge();
-      showToast("Gemini API key cleared.");
-    })
-    .withFailureHandler(err => {
-      hideLoader();
-      showToast("Failed to delete API Key: " + err.message, true);
-    })
-    .deleteApiKey();
-}
+  function switchView(viewId) {
+    // Update Tabs
+    els.tabs.forEach(t => t.classList.remove('active'));
+    const targetTab = document.querySelector(`.nav-tab[data-view="${viewId}"]`);
+    if (targetTab) targetTab.classList.add('active');
 
-/**
- * Generate Meal Plan using Gemini API
- */
-function handleGenerateMealPlan() {
-  if (!appState.hasApiKey) {
-    showToast("Please save your Gemini API Key in Settings first.", true);
-    switchView('settings');
-    return;
+    // Update Views
+    els.views.forEach(v => v.classList.remove('active'));
+    const targetView = document.getElementById(`${viewId}-view`);
+    if (targetView) targetView.classList.add('active');
+
+    // Fetch history if the tab is selected
+    if (viewId === 'history') {
+      loadHistoryData();
+    }
   }
-  
-  const count = parseInt(els.mealCountInput.value, 10) || 7;
-  showLoader("Calling Gemini AI...", "Generating " + count + " dinner recipes. Scaling ingredients for " + (els.prefDiners.value || 2) + " diners. This takes about 10-15 seconds.");
-  
-  google.script.run
-    .withSuccessHandler(res => {
-      hideLoader();
-      appState.db = res.db;
-      renderMealPlan();
-      showToast("Meal plan generated successfully!");
-    })
-    .withFailureHandler(err => {
-      hideLoader();
-      showToast("Generation failed: " + err.message, true);
-    })
-    .generateMealPlanServer(count);
-}
 
-/**
- * Calculate the next upcoming Sunday and increment daily offsets.
- */
-function getNextSundayDateString(offsetDays = 0) {
-  const d = new Date();
-  const day = d.getDay();
-  // Calculate steps to Sunday. If today is Sunday (0), next Sunday is in 7 days
-  let steps = 7 - day;
-  if (steps === 0) steps = 7;
-  
-  d.setDate(d.getDate() + steps + offsetDays);
-  
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+  /**
+   * Load initial data from Drive and User Properties
+   */
+  function loadInitialData() {
+    showLoader("Loading configuration...", "Retrieving your data from Google Drive");
+    google.script.run
+      .withSuccessHandler(onInitialDataLoaded)
+      .withFailureHandler(err => {
+        hideLoader();
+        showToast("Failed to load initial data: " + err.message, true);
+      })
+      .loadAppData();
+  }
 
-/**
- * Renders the Meal Plan interface based on current DB state
- */
-function renderMealPlan() {
-  const plan = appState.db.mealPlan;
-  
-  if (!plan) {
-    els.plannerContainer.innerHTML = `
+  function onInitialDataLoaded(data) {
+    hideLoader();
+    appState.db = data.db;
+    appState.hasApiKey = data.hasApiKey;
+
+    // Populate Preferences Form
+    const prefs = appState.db.preferences || {};
+    els.prefAllergies.value = prefs.allergies || "";
+    els.prefDietaryPreferences.value = prefs.dietaryPreferences || "";
+    els.prefOnHand.value = prefs.onHandIngredients || "";
+    els.prefDiners.value = prefs.dinersCount || 2;
+    els.prefMealTime.value = prefs.defaultMealTime || "06:00 PM";
+
+    // Update API Badge
+    updateApiBadge();
+
+    // Render Meal Plan
+    renderMealPlan();
+  }
+
+  /**
+   * Update the Gemini API status badge
+   */
+  function updateApiBadge() {
+    if (appState.hasApiKey) {
+      els.apiBadge.className = "api-badge active";
+      els.apiBadge.innerHTML = "• API Key Saved";
+      els.apiKeyInput.placeholder = "••••••••••••••••••••••••••••••••";
+      els.apiKeyInput.value = "";
+    } else {
+      els.apiBadge.className = "api-badge missing";
+      els.apiBadge.innerHTML = "• API Key Missing";
+      els.apiKeyInput.placeholder = "Enter your Gemini API key...";
+      els.apiKeyInput.value = "";
+    }
+  }
+
+  /**
+   * Save Preferences to Drive
+   */
+  function handleSavePreferences() {
+    const prefs = {
+      allergies: els.prefAllergies.value.trim(),
+      dietaryPreferences: els.prefDietaryPreferences.value.trim(),
+      onHandIngredients: els.prefOnHand.value.trim(),
+      dinersCount: parseInt(els.prefDiners.value, 10) || 2,
+      defaultMealTime: els.prefMealTime.value.trim()
+    };
+
+    showLoader("Saving preferences...", "Updating your database in Google Drive");
+
+    google.script.run
+      .withSuccessHandler(data => {
+        hideLoader();
+        appState.db = data.db;
+        showToast("Preferences saved successfully!");
+      })
+      .withFailureHandler(err => {
+        hideLoader();
+        showToast("Failed to save preferences: " + err.message, true);
+      })
+      .savePreferences(prefs);
+  }
+
+  /**
+   * Save API Key to PropertiesService
+   */
+  function handleSaveApiKey() {
+    const key = els.apiKeyInput.value.trim();
+    if (!key) {
+      showToast("Please enter a valid API key.", true);
+      return;
+    }
+
+    showLoader("Saving API key...", "Storing credentials securely in Google Apps Script");
+
+    google.script.run
+      .withSuccessHandler(res => {
+        hideLoader();
+        appState.hasApiKey = true;
+        updateApiBadge();
+        showToast("Gemini API key saved securely!");
+      })
+      .withFailureHandler(err => {
+        hideLoader();
+        showToast("Failed to save API Key: " + err.message, true);
+      })
+      .saveApiKey(key);
+  }
+
+  /**
+   * Delete API Key from PropertiesService
+   */
+  function handleDeleteApiKey() {
+    showLoader("Clearing API key...", "Removing credentials from Google Apps Script");
+
+    google.script.run
+      .withSuccessHandler(res => {
+        hideLoader();
+        appState.hasApiKey = false;
+        updateApiBadge();
+        showToast("Gemini API key cleared.");
+      })
+      .withFailureHandler(err => {
+        hideLoader();
+        showToast("Failed to delete API Key: " + err.message, true);
+      })
+      .deleteApiKey();
+  }
+
+  /**
+   * Generate Meal Plan using Gemini API
+   */
+  function handleGenerateMealPlan() {
+    if (!appState.hasApiKey) {
+      showToast("Please save your Gemini API Key in Settings first.", true);
+      switchView('settings');
+      return;
+    }
+
+    const count = parseInt(els.mealCountInput.value, 10) || 7;
+    showLoader("Calling Gemini AI...", "Generating " + count + " dinner recipes. Scaling ingredients for " + (els.prefDiners.value || 2) + " diners. This takes about 10-15 seconds.");
+
+    google.script.run
+      .withSuccessHandler(res => {
+        hideLoader();
+        appState.db = res.db;
+        renderMealPlan();
+        showToast("Meal plan generated successfully!");
+      })
+      .withFailureHandler(err => {
+        hideLoader();
+        showToast("Generation failed: " + err.message, true);
+      })
+      .generateMealPlanServer(count);
+  }
+
+  /**
+   * Calculate the next upcoming Sunday and increment daily offsets.
+   */
+  function getNextSundayDateString(offsetDays = 0) {
+    const d = new Date();
+    const day = d.getDay();
+    // Calculate steps to Sunday. If today is Sunday (0), next Sunday is in 7 days
+    let steps = 7 - day;
+    if (steps === 0) steps = 7;
+
+    d.setDate(d.getDate() + steps + offsetDays);
+
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  /**
+   * Renders the Meal Plan interface based on current DB state
+   */
+  function renderMealPlan() {
+    const plan = appState.db.mealPlan;
+
+    if (!plan) {
+      els.plannerContainer.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">🍽️</div>
         <h3>No Meal Plan Generated Yet</h3>
         <p>Choose the number of meals to generate above and click Generate Dinner Plan to begin.</p>
       </div>
     `;
-    return;
-  }
-  
-  // Reset selection set
-  appState.selectedRecipes.clear();
-  
-  // Header HTML
-  let html = `
+      return;
+    }
+
+    // Reset selection set
+    appState.selectedRecipes.clear();
+
+    // Header HTML
+    let html = `
     <div class="meal-plan-header">
       <div>
         <div class="meal-plan-title">Active Weekly Plan</div>
@@ -273,25 +273,24 @@ function renderMealPlan() {
       </div>
       <div>
   `;
-  
-  if (!plan.approved) {
-    html += `<button class="btn btn-gold" onclick="handleExecutePlan()"><i class="brand-icon" style="font-size:16px; color:#121824;">✓</i> Execute Approved Plan</button>`;
-  } else {
-    html += `<span class="api-badge active" style="font-size: 13px; padding: 8px 16px;">✓ Fully Approved & Executed</span>`;
-  }
-  
-  html += `
+
+    if (!plan.approved) {
+      html += `<button class="btn btn-gold" onclick="handleExecutePlan()"><i class="brand-icon" style="font-size:16px; color:#121824;">✓</i> Execute Approved Plan</button>`;
+    } else {
+      html += `<span class="api-badge active" style="font-size: 13px; padding: 8px 16px;">✓ Fully Approved & Executed</span>`;
+    }
+
+    html += `
       </div>
     </div>
   `;
-  
-  // If plan is approved and fully executed, show links to generated artifacts
-  if (plan.approved && plan.executionResult) {
-    const res = plan.executionResult;
-    html += `
+
+    // If plan is approved and fully executed, show links to generated artifacts
+    if (plan.approved && plan.executionResult) {
+      const res = plan.executionResult;
+      html += `
       <div class="success-box">
-        <div class="success-icon">🎉</div>
-        <h4 class="success-title">Plan successfully synced!</h4>
+        <h4 class="success-title">Meal plan complete!</h4>
         <p class="success-desc">Individual recipe instructions have been uploaded to your Google Drive, dinner prep events have been added to your Default Google Calendar, and a consolidated shopping list document has been compiled.</p>
         <div class="success-links">
           <a href="${res.shoppingListDocUrl}" target="_blank" class="doc-link">🛒 Open Shopping List (${res.shoppingListDocName})</a>
@@ -302,35 +301,35 @@ function renderMealPlan() {
       <div style="font-size: 14px; font-weight:600; margin-bottom: 16px; text-transform: uppercase; color:var(--text-muted);">Generated Recipe Documents</div>
       <div class="success-links" style="justify-content: flex-start; margin-bottom: 32px;">
     `;
-    res.recipeDocs.forEach(doc => {
-      html += `<a href="${doc.url}" target="_blank" class="doc-link">📄 [${doc.date}] ${doc.name}</a>`;
-    });
-    html += `</div>`;
-  }
-  
-  // Render Recipe Cards Grid
-  html += `<div class="recipe-grid">`;
-  
-  plan.recipes.forEach((recipe, idx) => {
-    // Add to initial selection set
-    appState.selectedRecipes.add(recipe.name);
-    
-    // Default scheduled date logic
-    let defaultDate = getNextSundayDateString(idx);
-    
-    // Find if date was already saved in execution results
-    if (plan.approved && plan.executionResult && plan.executionResult.recipeDocs) {
-      const match = plan.executionResult.recipeDocs.find(d => d.name === recipe.name);
-      if (match) {
-        defaultDate = match.date;
-      }
+      res.recipeDocs.forEach(doc => {
+        html += `<a href="${doc.url}" target="_blank" class="doc-link">📄 [${doc.date}] ${doc.name}</a>`;
+      });
+      html += `</div>`;
     }
-    
-    // Build recipe details list
-    const ingredientsList = recipe.ingredients.map(ing => `<li>${ing.amount} ${ing.unit} ${ing.name}</li>`).join('');
-    const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
-    
-    html += `
+
+    // Render Recipe Cards Grid
+    html += `<div class="recipe-grid">`;
+
+    plan.recipes.forEach((recipe, idx) => {
+      // Add to initial selection set
+      appState.selectedRecipes.add(recipe.name);
+
+      // Default scheduled date logic
+      let defaultDate = getNextSundayDateString(idx);
+
+      // Find if date was already saved in execution results
+      if (plan.approved && plan.executionResult && plan.executionResult.recipeDocs) {
+        const match = plan.executionResult.recipeDocs.find(d => d.name === recipe.name);
+        if (match) {
+          defaultDate = match.date;
+        }
+      }
+
+      // Build recipe details list
+      const ingredientsList = recipe.ingredients.map(ing => `<li>${ing.amount} ${ing.unit} ${ing.name}</li>`).join('');
+      const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+
+      html += `
       <div class="recipe-card approved-card" id="recipe-${idx}" onclick="toggleRecipeSelection(${idx}, '${escapeJSString(recipe.name)}')">
         <div class="recipe-card-header">
           <div class="recipe-title">${recipe.name}</div>
@@ -341,10 +340,10 @@ function renderMealPlan() {
         
         <div class="recipe-date-container" onclick="event.stopPropagation()">
           <span class="recipe-date-label">Schedule Prep:</span>
-          ${plan.approved 
-            ? `<span style="font-size: 13px; font-weight:600; color:var(--accent-secondary);">${defaultDate}</span>` 
-            : `<input type="date" class="recipe-date-input" id="date-${idx}" value="${defaultDate}">`
-          }
+          ${plan.approved
+          ? `<span style="font-size: 13px; font-weight:600; color:var(--accent-secondary);">${defaultDate}</span>`
+          : `<input type="date" class="recipe-date-input" id="date-${idx}" value="${defaultDate}">`
+        }
         </div>
         
         <div class="recipe-meta-row">
@@ -374,188 +373,188 @@ function renderMealPlan() {
         </div>
       </div>
     `;
-  });
-  
-  html += `</div>`;
-  
-  // Re-generate button for quick updates
-  if (!plan.approved) {
-    html += `
+    });
+
+    html += `</div>`;
+
+    // Re-generate button for quick updates
+    if (!plan.approved) {
+      html += `
       <div style="display:flex; justify-content:center; margin-top:16px;">
         <button class="btn btn-secondary" onclick="handleGenerateMealPlan()"><i class="brand-icon" style="font-size:14px; color:var(--accent-primary);">✦</i> Regenerate Entire Plan</button>
       </div>
     `;
-  }
-  
-  els.plannerContainer.innerHTML = html;
-}
-
-/**
- * Handle individual card toggles
- */
-function toggleRecipeSelection(idx, recipeName) {
-  const plan = appState.db.mealPlan;
-  if (plan && plan.approved) return; // Disallow toggle if already approved
-  
-  const card = document.getElementById(`recipe-${idx}`);
-  
-  if (appState.selectedRecipes.has(recipeName)) {
-    appState.selectedRecipes.delete(recipeName);
-    card.className = "recipe-card deselected-card";
-  } else {
-    appState.selectedRecipes.add(recipeName);
-    card.className = "recipe-card approved-card";
-  }
-}
-
-/**
- * Toggle details accordion inside card
- */
-function toggleDetails(idx) {
-  const details = document.getElementById(`details-${idx}`);
-  const btn = details.previousElementSibling;
-  
-  if (details.classList.contains('open')) {
-    details.classList.remove('open');
-    btn.innerHTML = "<span>📋 View Details</span>";
-  } else {
-    details.classList.add('open');
-    btn.innerHTML = "<span>❌ Hide Details</span>";
-  }
-}
-
-/**
- * Executes approved meal plan
- */
-function handleExecutePlan() {
-  const plan = appState.db.mealPlan;
-  if (!plan) return;
-  
-  // Gather approved recipe name and date mappings
-  const approvedList = [];
-  plan.recipes.forEach((recipe, idx) => {
-    if (appState.selectedRecipes.has(recipe.name)) {
-      const dateEl = document.getElementById(`date-${idx}`);
-      const dateVal = dateEl ? dateEl.value : getNextSundayDateString(idx);
-      approvedList.push({
-        name: recipe.name,
-        date: dateVal
-      });
     }
-  });
-  
-  if (approvedList.length === 0) {
-    showToast("Please approve at least one recipe before executing.", true);
-    return;
+
+    els.plannerContainer.innerHTML = html;
   }
-  
-  showLoader("Executing Workflow...", "Generating Google Docs for each recipe, scheduling calendar events, and compiling consolidated shopping list inside the folders in your Google Drive.");
-  
-  google.script.run
-    .withSuccessHandler(res => {
-      hideLoader();
-      appState.db = res.db;
-      renderMealPlan();
-      showToast("Workspace pipeline completed successfully!");
-    })
-    .withFailureHandler(err => {
-      hideLoader();
-      showToast("Execution failed: " + err.message, true);
-    })
-    .approveMealPlanServer(approvedList);
-}
 
-/**
- * Loading Screen Helpers
- */
-function showLoader(title, subtext) {
-  document.getElementById('loading-title').innerText = title;
-  document.getElementById('loading-subtext').innerText = subtext;
-  els.loader.style.display = 'flex';
-  
-  // Hide active views during loader
-  els.views.forEach(v => v.style.display = 'none');
-}
+  /**
+   * Handle individual card toggles
+   */
+  function toggleRecipeSelection(idx, recipeName) {
+    const plan = appState.db.mealPlan;
+    if (plan && plan.approved) return; // Disallow toggle if already approved
 
-function hideLoader() {
-  els.loader.style.display = 'none';
-  // Restore views
-  els.views.forEach(v => v.style.display = '');
-}
+    const card = document.getElementById(`recipe-${idx}`);
 
-/**
- * Toast Notifications
- */
-let toastTimeout;
-function showToast(message, isError = false) {
-  clearTimeout(toastTimeout);
-  
-  els.toast.innerHTML = isError 
-    ? `⚠️ <span style="flex-grow:1;">${message}</span>`
-    : `✅ <span style="flex-grow:1;">${message}</span>`;
-    
-  if (isError) {
-    els.toast.classList.add('toast-error');
-  } else {
-    els.toast.classList.remove('toast-error');
+    if (appState.selectedRecipes.has(recipeName)) {
+      appState.selectedRecipes.delete(recipeName);
+      card.className = "recipe-card deselected-card";
+    } else {
+      appState.selectedRecipes.add(recipeName);
+      card.className = "recipe-card approved-card";
+    }
   }
-  
-  els.toast.classList.add('show');
-  
-  toastTimeout = setTimeout(() => {
-    els.toast.classList.remove('show');
-  }, 4000);
-}
 
-/**
- * Escapes single quotes for JS strings
- */
-function escapeJSString(str) {
-  return str.replace(/'/g, "\\'");
-}
+  /**
+   * Toggle details accordion inside card
+   */
+  function toggleDetails(idx) {
+    const details = document.getElementById(`details-${idx}`);
+    const btn = details.previousElementSibling;
 
-/**
- * Fetch recipe history from server
- */
-function loadHistoryData() {
-  els.historyContainer.innerHTML = `
+    if (details.classList.contains('open')) {
+      details.classList.remove('open');
+      btn.innerHTML = "<span>📋 View Details</span>";
+    } else {
+      details.classList.add('open');
+      btn.innerHTML = "<span>❌ Hide Details</span>";
+    }
+  }
+
+  /**
+   * Executes approved meal plan
+   */
+  function handleExecutePlan() {
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+
+    // Gather approved recipe name and date mappings
+    const approvedList = [];
+    plan.recipes.forEach((recipe, idx) => {
+      if (appState.selectedRecipes.has(recipe.name)) {
+        const dateEl = document.getElementById(`date-${idx}`);
+        const dateVal = dateEl ? dateEl.value : getNextSundayDateString(idx);
+        approvedList.push({
+          name: recipe.name,
+          date: dateVal
+        });
+      }
+    });
+
+    if (approvedList.length === 0) {
+      showToast("Please approve at least one recipe before executing.", true);
+      return;
+    }
+
+    showLoader("Executing Workflow...", "Generating Google Docs for each recipe, scheduling calendar events, and compiling consolidated shopping list inside the folders in your Google Drive.");
+
+    google.script.run
+      .withSuccessHandler(res => {
+        hideLoader();
+        appState.db = res.db;
+        renderMealPlan();
+        showToast("Workspace pipeline completed successfully!");
+      })
+      .withFailureHandler(err => {
+        hideLoader();
+        showToast("Execution failed: " + err.message, true);
+      })
+      .approveMealPlanServer(approvedList);
+  }
+
+  /**
+   * Loading Screen Helpers
+   */
+  function showLoader(title, subtext) {
+    document.getElementById('loading-title').innerText = title;
+    document.getElementById('loading-subtext').innerText = subtext;
+    els.loader.style.display = 'flex';
+
+    // Hide active views during loader
+    els.views.forEach(v => v.style.display = 'none');
+  }
+
+  function hideLoader() {
+    els.loader.style.display = 'none';
+    // Restore views
+    els.views.forEach(v => v.style.display = '');
+  }
+
+  /**
+   * Toast Notifications
+   */
+  let toastTimeout;
+  function showToast(message, isError = false) {
+    clearTimeout(toastTimeout);
+
+    els.toast.innerHTML = isError
+      ? `⚠️ <span style="flex-grow:1;">${message}</span>`
+      : `✅ <span style="flex-grow:1;">${message}</span>`;
+
+    if (isError) {
+      els.toast.classList.add('toast-error');
+    } else {
+      els.toast.classList.remove('toast-error');
+    }
+
+    els.toast.classList.add('show');
+
+    toastTimeout = setTimeout(() => {
+      els.toast.classList.remove('show');
+    }, 4000);
+  }
+
+  /**
+   * Escapes single quotes for JS strings
+   */
+  function escapeJSString(str) {
+    return str.replace(/'/g, "\\'");
+  }
+
+  /**
+   * Fetch recipe history from server
+   */
+  function loadHistoryData() {
+    els.historyContainer.innerHTML = `
     <div style="display:flex; justify-content:center; align-items:center; padding: 32px;">
       <div class="loader" style="width:32px; height:32px; border-width:3px; margin-bottom:0; margin-right: 12px;"></div>
       <span style="font-size:14px; color:var(--text-secondary);">Querying Google Drive folder...</span>
     </div>
   `;
-  
-  google.script.run
-    .withSuccessHandler(onHistoryLoaded)
-    .withFailureHandler(err => {
-      els.historyContainer.innerHTML = `
+
+    google.script.run
+      .withSuccessHandler(onHistoryLoaded)
+      .withFailureHandler(err => {
+        els.historyContainer.innerHTML = `
         <div style="color:var(--error); padding: 16px; font-size:14px; background:rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.15); border-radius:8px;">
           ⚠️ Failed to load recipe history: ${err.message}
         </div>
       `;
-    })
-    .getRecipeHistory();
-}
+      })
+      .getRecipeHistory();
+  }
 
-/**
- * Render history list when loaded
- */
-function onHistoryLoaded(history) {
-  if (!history || history.length === 0) {
-    els.historyContainer.innerHTML = `
+  /**
+   * Render history list when loaded
+   */
+  function onHistoryLoaded(history) {
+    if (!history || history.length === 0) {
+      els.historyContainer.innerHTML = `
       <div class="empty-state" style="border-style: solid; padding: 32px 16px;">
         <div class="empty-state-icon" style="font-size:32px;">📜</div>
         <h3>No Recipe Docs Found</h3>
         <p>Once you generate and execute a meal plan, approved recipes will be saved in your Google Drive and displayed here.</p>
       </div>
     `;
-    return;
-  }
-  
-  let html = `<div class="history-list">`;
-  
-  history.forEach(item => {
-    html += `
+      return;
+    }
+
+    let html = `<div class="history-list">`;
+
+    history.forEach(item => {
+      html += `
       <div class="history-item">
         <div class="history-item-left">
           <span class="history-item-date">${item.date}</span>
@@ -566,9 +565,9 @@ function onHistoryLoaded(history) {
         </a>
       </div>
     `;
-  });
-  
-  html += `</div>`;
-  els.historyContainer.innerHTML = html;
-}
+    });
+
+    html += `</div>`;
+    els.historyContainer.innerHTML = html;
+  }
 </script>
