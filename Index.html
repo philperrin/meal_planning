@@ -88,16 +88,12 @@
 
           <!-- Cuisine Preferences Section -->
           <div class="form-group" style="margin-top: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
               <div>
-                <label style="margin-bottom: 0;">Cuisine & Meal Style Preferences</label>
+                <label style="margin-bottom: 2px;">Cuisine & Meal Style Preferences</label>
                 <div class="input-desc" style="margin-bottom: 0;">Select <strong>Prefer</strong> to prioritize cuisines, <strong>Avoid</strong> to strictly exclude them, or leave blank/neutral.</div>
               </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <input type="text" id="cuisine-search-input" placeholder="🔍 Search cuisines..." oninput="handleFilterCuisines()"
-                  style="padding: 6px 12px; font-size: 13px; width: 170px; background: rgba(28, 30, 21, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: var(--radius-sm); color: var(--text-primary);">
-                <button type="button" class="btn btn-secondary" onclick="handleResetCuisines()" style="padding: 6px 12px; font-size: 12px; height: auto;">↺ Reset All</button>
-              </div>
+              <button type="button" class="btn btn-secondary" onclick="handleResetCuisines()" style="padding: 6px 14px; font-size: 12px; height: auto;">↺ Reset All</button>
             </div>
             
             <div id="cuisine-grid" class="cuisine-grid">

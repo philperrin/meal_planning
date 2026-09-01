@@ -8,32 +8,22 @@ These preferences will persist in the user's Google Drive database (`Automated_M
 ---
 
 ## 2. Identified Cuisine Types
-A curated list of 22 popular and diverse cuisine & dietary preference types covering everyday home cooking and global dining:
+A curated list of 12 popular cuisine and dietary preference types in alphabetical order:
 
-| # | Cuisine | Description / Typical Dishes |
+| # | Cuisine / Style | Description / Typical Dishes |
 |---|---|---|
-| 1 | **Italian** | Pasta, risotto, rustic baked dishes, tomato/herb-rich preparations |
-| 2 | **Mexican** | Tacos, enchiladas, fajitas, salsas, chili & lime flavor profiles |
-| 3 | **American / Comfort** | Roasts, burgers, grilled meats, casseroles, pot pies, BBQ |
-| 4 | **Chinese** | Stir-fries, dumplings, fried rice, noodle dishes, savory-sweet glazes |
-| 5 | **Japanese** | Teriyaki, ramen, udon, donburi bowls, miso-glazed proteins |
-| 6 | **Indian** | Curries, tikka masala, dal, biryani, spiced stews |
-| 7 | **Thai** | Pad Thai, coconut curries, spicy basil stir-fries, lemongrass/lime soups |
-| 8 | **Mediterranean / Greek** | Souvlaki, gyro bowls, roasted lemon chicken, olive oil & feta dishes |
-| 9 | **Middle Eastern / Levantine** | Shawarma bowls, falafel, shakshuka, za'atar chicken, kofta |
-| 10 | **French** | Braised meats, quiches, ratatouille, herb pan sauces, rustic gratins |
-| 11 | **Korean** | Bulgogi, bibimbap, kimchi stews, glazed chicken, gochujang marinades |
-| 12 | **Vietnamese** | Pho bowls, banh mi inspired plates, noodle bowls (bun cha), fresh rolls |
-| 13 | **Spanish** | Paella, tapas-style platters, garlic shrimp, braised chicken, Romesco |
-| 14 | **Cajun & Creole** | Jambalaya, gumbo, blackened fish/chicken, etouffee |
-| 15 | **Tex-Mex / Southwestern** | Sheet-pan fajitas, chili con carne, quesadillas, loaded taco bowls |
-| 16 | **Caribbean / Jamaican** | Jerk chicken, curried goat/chicken, rice & peas, mojo pork |
-| 17 | **British & Irish** | Shepherd's pie, cottage pie, fish & chips, beef stew, bangers & mash |
-| 18 | **German & Central European** | Schnitzel, roasted sausages, goulash, braised cabbage dishes |
-| 19 | **Moroccan & North African** | Tagines, spiced couscous, harissa roasted chicken/vegetables |
-| 20 | **Southeast Asian / Indonesian** | Satay, nasi goreng, rendang, peanut sauce dishes |
-| 21 | **Vegetarian** | Plant-forward meals, legumes, dairy/egg options, tofu/tempeh, meatless mains |
-| 22 | **Vegan** | 100% plant-based recipes, no animal products/dairy/honey |
+| 1 | **American / Classic Comfort** | Roasts, burgers, grilled meats, casseroles, pot pies, BBQ |
+| 2 | **Chinese** | Stir-fries, dumplings, fried rice, noodle dishes, savory-sweet glazes |
+| 3 | **Indian** | Curries, tikka masala, dal, biryani, spiced stews |
+| 4 | **Italian** | Pasta, risotto, rustic baked dishes, tomato/herb-rich preparations |
+| 5 | **Korean** | Bulgogi, bibimbap, kimchi stews, glazed chicken, gochujang marinades |
+| 6 | **Mediterranean / Greek** | Souvlaki, gyro bowls, roasted lemon chicken, olive oil & feta dishes |
+| 7 | **Mexican** | Tacos, enchiladas, fajitas, salsas, chili & lime flavor profiles |
+| 8 | **Middle Eastern / Levantine** | Shawarma bowls, falafel, shakshuka, za'atar chicken, kofta |
+| 9 | **Tex-Mex / Southwestern** | Sheet-pan fajitas, chili con carne, quesadillas, loaded taco bowls |
+| 10 | **Thai** | Pad Thai, coconut curries, spicy basil stir-fries, lemongrass/lime soups |
+| 11 | **Vegan** | 100% plant-based recipes, no animal products/dairy/honey |
+| 12 | **Vegetarian** | Plant-forward meals, legumes, dairy/egg options, tofu/tempeh, meatless mains |
 
 ---
 
@@ -41,14 +31,13 @@ A curated list of 22 popular and diverse cuisine & dietary preference types cove
 
 ### 3.1 Layout & Visual Design
 - **Section Placement**: Inserted into the "Preferences" view between the free-text Dietary Preferences textarea and the On-Hand Ingredients textarea.
-- **Controls**: Interactive cards or a responsive grid of cuisine items.
+- **2-Column Layout**: Rendered as 2 columns of 6 cuisine cards arranged top-to-bottom, left-to-right in alphabetical order, maximizing space for full cuisine names.
 - **3-State Segmented Control / Pill Selector**:
-  - `Neutral` (Default): Gray/subtle muted appearance. The cuisine is available normally.
-  - `Prefer` (Thumbs Up / Heart / Bookmark): Highlighted with theme accent (Sage green `--accent-primary`), signaling priority to the AI.
-  - `Avoid` (Thumbs Down / Prohibited / Cross): Highlighted with warning/danger styling (Soft red `--error`), signaling strict exclusion to the AI.
-- **Quick Actions**:
-  - `Reset All to Neutral` button to clear custom cuisine selections with one click.
-  - Optional search/filter input to quickly find a cuisine in the list.
+  - `None` (Default): Gray/subtle muted appearance. The cuisine is available normally.
+  - `Prefer` (Sage green `--accent-primary`): Signals priority to the AI.
+  - `Avoid` (Soft red `--error`): Signals strict exclusion to the AI.
+- **Quick Action**:
+  - `↺ Reset All` button to clear custom cuisine selections back to neutral with one click.
 
 ---
 

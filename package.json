@@ -8,7 +8,9 @@
     "login": "clasp login",
     "push": "clasp push",
     "pull": "clasp pull",
-    "watch": "clasp push --watch"
+    "watch": "clasp push --watch",
+    "deploy": "clasp deploy",
+    "ship": "node ship.js"
   },
   "keywords": [],
   "author": "",

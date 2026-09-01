@@ -15,30 +15,20 @@
     cuisinePreferences: {}
   };
 
-  // Master Cuisine List
+  // Master Cuisine List (12 items in alphabetical order)
   const CUISINES = [
-    { name: "Italian", icon: "🍝" },
-    { name: "Mexican", icon: "🌮" },
     { name: "American / Classic Comfort", icon: "🍔" },
     { name: "Chinese", icon: "🥡" },
-    { name: "Japanese", icon: "🍣" },
     { name: "Indian", icon: "🍛" },
-    { name: "Thai", icon: "🍜" },
-    { name: "Mediterranean / Greek", icon: "🫒" },
-    { name: "Middle Eastern / Levantine", icon: "🧆" },
-    { name: "French", icon: "🥖" },
+    { name: "Italian", icon: "🍝" },
     { name: "Korean", icon: "🍲" },
-    { name: "Vietnamese", icon: "🥢" },
-    { name: "Spanish", icon: "🥘" },
-    { name: "Cajun & Creole", icon: "🍤" },
+    { name: "Mediterranean / Greek", icon: "🫒" },
+    { name: "Mexican", icon: "🌮" },
+    { name: "Middle Eastern / Levantine", icon: "🧆" },
     { name: "Tex-Mex / Southwestern", icon: "🥑" },
-    { name: "Caribbean / Jamaican", icon: "🥥" },
-    { name: "British & Irish", icon: "🥧" },
-    { name: "German & Central European", icon: "🥨" },
-    { name: "Moroccan & North African", icon: "🏺" },
-    { name: "Southeast Asian / Indonesian", icon: "🍢" },
-    { name: "Vegetarian", icon: "🥗" },
-    { name: "Vegan", icon: "🌱" }
+    { name: "Thai", icon: "🍜" },
+    { name: "Vegan", icon: "🌱" },
+    { name: "Vegetarian", icon: "🥗" }
   ];
 
   // UI Elements
@@ -55,7 +45,6 @@
     prefDiners: document.getElementById('pref-diners'),
     prefMealTime: document.getElementById('pref-meal-time'),
     cuisineGrid: document.getElementById('cuisine-grid'),
-    cuisineSearchInput: document.getElementById('cuisine-search-input'),
 
     // Settings Inputs
     apiKeyInput: document.getElementById('api-key-input'),
@@ -143,17 +132,13 @@
   }
 
   /**
-   * Render the Cuisine Preferences grid
+   * Render the Cuisine Preferences grid (12 cuisines in 2 columns of 6)
    */
   function renderCuisineGrid() {
     if (!els.cuisineGrid) return;
-    const filterQuery = (els.cuisineSearchInput ? els.cuisineSearchInput.value : "").trim().toLowerCase();
     
     let html = "";
     CUISINES.forEach(c => {
-      const isVisible = !filterQuery || c.name.toLowerCase().includes(filterQuery);
-      if (!isVisible) return;
-      
       const currentPref = (appState.cuisinePreferences && appState.cuisinePreferences[c.name]) || "neutral";
       const statusClass = currentPref === 'prefer' ? 'status-prefer' : (currentPref === 'avoid' ? 'status-avoid' : '');
       
@@ -175,10 +160,6 @@
       `;
     });
     
-    if (html === "") {
-      html = `<div style="grid-column: 1 / -1; color: var(--text-muted); font-size: 13px; padding: 16px; text-align: center;">No cuisines match "${escapeHtml(filterQuery)}".</div>`;
-    }
-    
     els.cuisineGrid.innerHTML = html;
   }
 
@@ -198,20 +179,10 @@
   }
 
   /**
-   * Filter cuisine items in real-time
-   */
-  function handleFilterCuisines() {
-    renderCuisineGrid();
-  }
-
-  /**
    * Reset all cuisine preferences to neutral
    */
   function handleResetCuisines() {
     appState.cuisinePreferences = {};
-    if (els.cuisineSearchInput) {
-      els.cuisineSearchInput.value = "";
-    }
     renderCuisineGrid();
     showToast("Cuisine preferences reset to neutral.");
   }

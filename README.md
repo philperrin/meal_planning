@@ -15,7 +15,7 @@ This application helps you plan weekly meals by:
 
 ### 🍽️ Personalized Meal Planning
 - Set dietary allergies and preferences
-- Configure **Cuisine & Meal Style Preferences** with 3-state controls (Prefer, Avoid, Neutral) across 22 global cuisines (including Vegetarian and Vegan)
+- Configure **Cuisine & Meal Style Preferences** with 3-state controls (Prefer, Avoid, None) across 12 popular cuisine and diet styles in a clean 2-column layout
 - Specify number of diners for automatic recipe scaling
 - Include ingredients you have on hand
 - Set default meal preparation time
@@ -123,7 +123,9 @@ meal_planning/
 ├── JavaScript.html      # Client-side JavaScript
 ├── Styles.html          # CSS styling
 ├── appsscript.json      # Apps Script configuration
-├── package.json         # NPM dependencies (Clasp)
+├── package.json         # NPM scripts and dependencies
+├── ship.js              # Post-commit deployment automation script
+├── spec/                # Technical specifications
 └── clasp_github_setup.md # Setup instructions for GitHub integration
 ```
 
@@ -211,7 +213,31 @@ npm run login    # Authenticate with Google Account
 npm run push     # Push local code to Apps Script
 npm run pull     # Pull code from Apps Script to local
 npm run watch    # Watch mode: auto-push on file changes
+npm run deploy   # Create a new versioned deployment in Apps Script
 ```
+
+### 🚀 Deployment & Release Workflow (All-in-One)
+
+After staging and committing your code changes locally via Git, you can push to GitHub, sync to Google Apps Script, and create a new Apps Script deployment all in one command:
+
+```bash
+# 1. Stage and commit changes
+git add .
+git commit -m "feat: your change description"
+
+# 2. Ship to GitHub + Google Apps Script + Apps Script Deployment
+npm run ship
+```
+
+#### What `npm run ship` does automatically:
+1. **GitHub Push**: Runs `git push` to synchronize remote commits.
+2. **Apps Script Push**: Runs `npx clasp push` to sync code files to Apps Script.
+3. **Apps Script Deploy**: Runs `npx clasp deploy` with your commit message to create a new versioned deployment.
+
+> **Tip:** If you wish to provide a custom deployment description different from your latest git commit, pass it as an argument:
+> ```bash
+> npm run ship -- "Custom release description"
+> ```
 
 ### Debugging
 - Check Apps Script Execution Log: **Executions** panel in Apps Script editor
