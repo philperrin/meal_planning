@@ -11,7 +11,7 @@
  *   npm run ship -- "Custom release description"
  */
 
-const { execSync, spawnSync } = require('child_process');
+const { execSync } = require('child_process');
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -27,25 +27,16 @@ function logStep(stepNum, totalSteps, title) {
   console.log(`\n${COLORS.cyan}${COLORS.bright}[${stepNum}/${totalSteps}] ${title}${COLORS.reset}`);
 }
 
-function runCommand(command, args = []) {
-  const fullCommandStr = args.length > 0 ? `${command} ${args.map(a => `"${a}"`).join(' ')}` : command;
-  console.log(`${COLORS.dim}> ${fullCommandStr}${COLORS.reset}`);
-  
-  const result = spawnSync(command, args, {
-    stdio: 'inherit',
-    shell: true
-  });
-
-  if (result.status !== 0) {
-    throw new Error(`Command failed with exit code ${result.status}: ${fullCommandStr}`);
-  }
+function runCommand(commandStr) {
+  console.log(`${COLORS.dim}> ${commandStr}${COLORS.reset}`);
+  execSync(commandStr, { stdio: 'inherit' });
 }
 
 function getCommitDescription() {
   // 1. Check if an explicit description was passed via CLI arguments
   const cliArgs = process.argv.slice(2).join(' ').trim();
   if (cliArgs) {
-    return cliArgs;
+    return cliArgs.replace(/["\r\n]+/g, ' ');
   }
 
   // 2. Fall back to the latest git commit subject/message
@@ -53,7 +44,7 @@ function getCommitDescription() {
     const gitMessage = execSync('git log -1 --pretty=%B', { encoding: 'utf8' }).trim();
     if (gitMessage) {
       // Use the first line of the commit message for the deployment description
-      return gitMessage.split('\n')[0].trim();
+      return gitMessage.split('\n')[0].replace(/["\r\n]+/g, ' ').trim();
     }
   } catch (e) {
     // If git log fails, proceed to default timestamp
@@ -90,11 +81,11 @@ function main() {
   try {
     // Step 1: Git Push
     logStep(1, TOTAL_STEPS, 'Pushing commits to remote repository (GitHub)...');
-    runCommand('git', ['push']);
+    runCommand('git push');
 
     // Step 2: Push to Google Apps Script
     logStep(2, TOTAL_STEPS, 'Pushing code to Google Apps Script (clasp push)...');
-    runCommand('npx', ['clasp', 'push']);
+    runCommand('npx clasp push');
 
     // Step 3: Deploy new version to Google Apps Script
     logStep(3, TOTAL_STEPS, 'Deploying new version to Google Apps Script (clasp deploy)...');
@@ -102,9 +93,9 @@ function main() {
     // Check if a specific deployment ID is set in the environment
     const deploymentId = process.env.CLASP_DEPLOYMENT_ID;
     if (deploymentId) {
-      runCommand('npx', ['clasp', 'deploy', '-i', deploymentId, '-d', description]);
+      runCommand(`npx clasp deploy -i "${deploymentId}" -d "${description}"`);
     } else {
-      runCommand('npx', ['clasp', 'deploy', '-d', description]);
+      runCommand(`npx clasp deploy -d "${description}"`);
     }
 
     console.log(`\n${COLORS.green}${COLORS.bright}✔ Deployment pipeline completed successfully!${COLORS.reset}\n`);
