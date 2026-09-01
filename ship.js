@@ -122,7 +122,7 @@ function main() {
 
     // Step 2: Push to Google Apps Script
     logStep(2, TOTAL_STEPS, 'Pushing code to Google Apps Script (clasp push)...');
-    runCommand('npx clasp push');
+    runCommand('npx clasp push -f');
 
     // Step 3: Deploy new version to Google Apps Script
     logStep(3, TOTAL_STEPS, 'Updating deployment in Google Apps Script (clasp deploy)...');
