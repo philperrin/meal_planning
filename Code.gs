@@ -30,6 +30,7 @@ function getDatabaseFile() {
       preferences: {
         allergies: "No eggs.",
         dietaryPreferences: "Strong preference for high protein and seasonal vegetables.",
+        cuisinePreferences: {},
         onHandIngredients: "",
         dinersCount: 2,
         defaultMealTime: "06:00 PM"
@@ -66,6 +67,11 @@ function loadAppData() {
     if (db.preferences.inventory !== undefined && db.preferences.onHandIngredients === undefined) {
       db.preferences.onHandIngredients = db.preferences.inventory;
       delete db.preferences.inventory;
+      updated = true;
+    }
+    // Ensure cuisinePreferences exists
+    if (db.preferences.cuisinePreferences === undefined) {
+      db.preferences.cuisinePreferences = {};
       updated = true;
     }
     // Ensure dinersCount exists
@@ -108,6 +114,7 @@ function savePreferences(preferences) {
     db.preferences = {
       allergies: preferences.allergies || "",
       dietaryPreferences: preferences.dietaryPreferences || "",
+      cuisinePreferences: (preferences.cuisinePreferences && typeof preferences.cuisinePreferences === 'object') ? preferences.cuisinePreferences : {},
       onHandIngredients: preferences.onHandIngredients || "",
       dinersCount: parseInt(preferences.dinersCount, 10) || 2,
       defaultMealTime: preferences.defaultMealTime || "06:00 PM"
@@ -167,12 +174,32 @@ function generateMealPlanServer(mealCount) {
     var db = JSON.parse(file.getBlob().getDataAsString());
     var prefs = db.preferences;
     
+    // Extract Preferred and Avoided Cuisines
+    var cuisinePrefs = prefs.cuisinePreferences || {};
+    var preferredCuisines = [];
+    var avoidedCuisines = [];
+    for (var cuisineKey in cuisinePrefs) {
+      if (cuisinePrefs[cuisineKey] === 'prefer') {
+        preferredCuisines.push(cuisineKey);
+      } else if (cuisinePrefs[cuisineKey] === 'avoid') {
+        avoidedCuisines.push(cuisineKey);
+      }
+    }
+    var cuisineConstraintText = "";
+    if (preferredCuisines.length > 0) {
+      cuisineConstraintText += "- Preferred Cuisines: Prioritize and feature dinner recipes inspired by the following cuisines: " + preferredCuisines.join(", ") + ".\n";
+    }
+    if (avoidedCuisines.length > 0) {
+      cuisineConstraintText += "- Avoided Cuisines: Strictly DO NOT generate any recipes, flavor profiles, or dishes associated with the following cuisines: " + avoidedCuisines.join(", ") + ".\n";
+    }
+
     // Construct the Gemini API Prompt
     var prompt = "You are a professional chef. Generate a dinner meal plan consisting of exactly " + mealCount + " dinner recipes. " +
                  "Scale all ingredient quantities in every recipe to feed exactly " + prefs.dinersCount + " diners.\n" +
                  "You MUST strictly follow these constraints:\n" +
-                 "- Allergy Constraint: " + prefs.allergies + "\n" +
-                 "- Dietary Preferences: " + prefs.dietaryPreferences + "\n" +
+                 "- Allergy Constraint: " + (prefs.allergies || "None specified") + "\n" +
+                 "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
+                 cuisineConstraintText +
                  (prefs.onHandIngredients ? "- On Hand Ingredients to use: " + prefs.onHandIngredients + "\n\n" : "\n\n") +
                  "Provide a variety of dinner meals. Every recipe must have ingredients, amounts, units, and clear step-by-step instructions. " +
                  "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";

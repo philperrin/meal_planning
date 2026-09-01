@@ -15,6 +15,7 @@ This application helps you plan weekly meals by:
 
 ### 🍽️ Personalized Meal Planning
 - Set dietary allergies and preferences
+- Configure **Cuisine & Meal Style Preferences** with 3-state controls (Prefer, Avoid, Neutral) across 22 global cuisines (including Vegetarian and Vegan)
 - Specify number of diners for automatic recipe scaling
 - Include ingredients you have on hand
 - Set default meal preparation time

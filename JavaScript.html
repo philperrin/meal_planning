@@ -11,8 +11,35 @@
       mealPlan: null
     },
     hasApiKey: false,
-    selectedRecipes: new Set()
+    selectedRecipes: new Set(),
+    cuisinePreferences: {}
   };
+
+  // Master Cuisine List
+  const CUISINES = [
+    { name: "Italian", icon: "🍝" },
+    { name: "Mexican", icon: "🌮" },
+    { name: "American / Classic Comfort", icon: "🍔" },
+    { name: "Chinese", icon: "🥡" },
+    { name: "Japanese", icon: "🍣" },
+    { name: "Indian", icon: "🍛" },
+    { name: "Thai", icon: "🍜" },
+    { name: "Mediterranean / Greek", icon: "🫒" },
+    { name: "Middle Eastern / Levantine", icon: "🧆" },
+    { name: "French", icon: "🥖" },
+    { name: "Korean", icon: "🍲" },
+    { name: "Vietnamese", icon: "🥢" },
+    { name: "Spanish", icon: "🥘" },
+    { name: "Cajun & Creole", icon: "🍤" },
+    { name: "Tex-Mex / Southwestern", icon: "🥑" },
+    { name: "Caribbean / Jamaican", icon: "🥥" },
+    { name: "British & Irish", icon: "🥧" },
+    { name: "German & Central European", icon: "🥨" },
+    { name: "Moroccan & North African", icon: "🏺" },
+    { name: "Southeast Asian / Indonesian", icon: "🍢" },
+    { name: "Vegetarian", icon: "🥗" },
+    { name: "Vegan", icon: "🌱" }
+  ];
 
   // UI Elements
   const els = {
@@ -27,6 +54,8 @@
     prefOnHand: document.getElementById('pref-on-hand'),
     prefDiners: document.getElementById('pref-diners'),
     prefMealTime: document.getElementById('pref-meal-time'),
+    cuisineGrid: document.getElementById('cuisine-grid'),
+    cuisineSearchInput: document.getElementById('cuisine-search-input'),
 
     // Settings Inputs
     apiKeyInput: document.getElementById('api-key-input'),
@@ -102,11 +131,109 @@
     els.prefDiners.value = prefs.dinersCount || 2;
     els.prefMealTime.value = prefs.defaultMealTime || "06:00 PM";
 
+    // Populate Cuisine Preferences
+    appState.cuisinePreferences = Object.assign({}, prefs.cuisinePreferences || {});
+    renderCuisineGrid();
+
     // Update API Badge
     updateApiBadge();
 
     // Render Meal Plan
     renderMealPlan();
+  }
+
+  /**
+   * Render the Cuisine Preferences grid
+   */
+  function renderCuisineGrid() {
+    if (!els.cuisineGrid) return;
+    const filterQuery = (els.cuisineSearchInput ? els.cuisineSearchInput.value : "").trim().toLowerCase();
+    
+    let html = "";
+    CUISINES.forEach(c => {
+      const isVisible = !filterQuery || c.name.toLowerCase().includes(filterQuery);
+      if (!isVisible) return;
+      
+      const currentPref = (appState.cuisinePreferences && appState.cuisinePreferences[c.name]) || "neutral";
+      const statusClass = currentPref === 'prefer' ? 'status-prefer' : (currentPref === 'avoid' ? 'status-avoid' : '');
+      
+      html += `
+        <div class="cuisine-card ${statusClass}" id="cuisine-card-${escapeHtmlId(c.name)}">
+          <div class="cuisine-info" title="${escapeHtml(c.name)}">
+            <span class="cuisine-icon">${c.icon}</span>
+            <span>${escapeHtml(c.name)}</span>
+          </div>
+          <div class="cuisine-toggle-group">
+            <button type="button" class="cuisine-btn ${currentPref === 'prefer' ? 'active-prefer' : ''}" 
+              onclick="setCuisinePreference('${escapeJSString(c.name)}', 'prefer')">Prefer</button>
+            <button type="button" class="cuisine-btn ${currentPref === 'neutral' ? 'active-neutral' : ''}" 
+              onclick="setCuisinePreference('${escapeJSString(c.name)}', 'neutral')">None</button>
+            <button type="button" class="cuisine-btn ${currentPref === 'avoid' ? 'active-avoid' : ''}" 
+              onclick="setCuisinePreference('${escapeJSString(c.name)}', 'avoid')">Avoid</button>
+          </div>
+        </div>
+      `;
+    });
+    
+    if (html === "") {
+      html = `<div style="grid-column: 1 / -1; color: var(--text-muted); font-size: 13px; padding: 16px; text-align: center;">No cuisines match "${escapeHtml(filterQuery)}".</div>`;
+    }
+    
+    els.cuisineGrid.innerHTML = html;
+  }
+
+  /**
+   * Set cuisine preference ('prefer' | 'avoid' | 'neutral')
+   */
+  function setCuisinePreference(cuisineName, preferenceState) {
+    if (!appState.cuisinePreferences) {
+      appState.cuisinePreferences = {};
+    }
+    if (preferenceState === 'neutral') {
+      delete appState.cuisinePreferences[cuisineName];
+    } else {
+      appState.cuisinePreferences[cuisineName] = preferenceState;
+    }
+    renderCuisineGrid();
+  }
+
+  /**
+   * Filter cuisine items in real-time
+   */
+  function handleFilterCuisines() {
+    renderCuisineGrid();
+  }
+
+  /**
+   * Reset all cuisine preferences to neutral
+   */
+  function handleResetCuisines() {
+    appState.cuisinePreferences = {};
+    if (els.cuisineSearchInput) {
+      els.cuisineSearchInput.value = "";
+    }
+    renderCuisineGrid();
+    showToast("Cuisine preferences reset to neutral.");
+  }
+
+  /**
+   * Escape HTML entities
+   */
+  function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  /**
+   * Escape string for DOM element ID
+   */
+  function escapeHtmlId(str) {
+    return String(str).replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
   }
 
   /**
@@ -133,6 +260,7 @@
     const prefs = {
       allergies: els.prefAllergies.value.trim(),
       dietaryPreferences: els.prefDietaryPreferences.value.trim(),
+      cuisinePreferences: appState.cuisinePreferences || {},
       onHandIngredients: els.prefOnHand.value.trim(),
       dinersCount: parseInt(els.prefDiners.value, 10) || 2,
       defaultMealTime: els.prefMealTime.value.trim()
