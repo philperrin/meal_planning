@@ -4,7 +4,7 @@
  * Automates:
  * 1. Pushing commits to GitHub (git push)
  * 2. Pushing project files to Google Apps Script (npm run push / clasp push)
- * 3. Creating a new version and deployment in Apps Script (clasp deploy)
+ * 3. Updating the existing Apps Script deployment with a new version (clasp deploy -i <id>)
  *
  * Usage:
  *   npm run ship
@@ -12,6 +12,8 @@
  */
 
 const { execSync } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
 const COLORS = {
   reset: '\x1b[0m',
@@ -56,6 +58,41 @@ function getCommitDescription() {
   return `Release ${dateStr}`;
 }
 
+function getTargetDeploymentId() {
+  // 1. Check environment variable
+  if (process.env.CLASP_DEPLOYMENT_ID) {
+    return process.env.CLASP_DEPLOYMENT_ID.trim();
+  }
+
+  // 2. Check .clasp.json for "deploymentId" property
+  try {
+    const claspJsonPath = path.join(__dirname, '.clasp.json');
+    if (fs.existsSync(claspJsonPath)) {
+      const claspConfig = JSON.parse(fs.readFileSync(claspJsonPath, 'utf8'));
+      if (claspConfig.deploymentId) {
+        return claspConfig.deploymentId.trim();
+      }
+    }
+  } catch (e) {
+    // Ignore error and fall through
+  }
+
+  // 3. Auto-discover active versioned deployment via clasp deployments
+  try {
+    const output = execSync('npx clasp deployments', { encoding: 'utf8' });
+    // Look for lines matching: - <deploymentId> @<version> (excluding @HEAD)
+    const matches = [...output.matchAll(/^-\s+([A-Za-z0-9_-]+)\s+@(\d+)/gm)];
+    if (matches && matches.length > 0) {
+      // Pick the first matching deployment ID
+      return matches[0][1];
+    }
+  } catch (e) {
+    console.log(`${COLORS.yellow}⚠ Could not auto-detect deployment ID from clasp deployments.${COLORS.reset}`);
+  }
+
+  return null;
+}
+
 function checkGitWorkingTree() {
   try {
     const status = execSync('git status --porcelain', { encoding: 'utf8' }).trim();
@@ -88,13 +125,14 @@ function main() {
     runCommand('npx clasp push');
 
     // Step 3: Deploy new version to Google Apps Script
-    logStep(3, TOTAL_STEPS, 'Deploying new version to Google Apps Script (clasp deploy)...');
+    logStep(3, TOTAL_STEPS, 'Updating deployment in Google Apps Script (clasp deploy)...');
     
-    // Check if a specific deployment ID is set in the environment
-    const deploymentId = process.env.CLASP_DEPLOYMENT_ID;
+    const deploymentId = getTargetDeploymentId();
     if (deploymentId) {
+      console.log(`${COLORS.dim}Targeting deployment ID: ${deploymentId}${COLORS.reset}`);
       runCommand(`npx clasp deploy -i "${deploymentId}" -d "${description}"`);
     } else {
+      console.log(`${COLORS.yellow}No existing deployment ID found. Creating a new deployment...${COLORS.reset}`);
       runCommand(`npx clasp deploy -d "${description}"`);
     }
 
