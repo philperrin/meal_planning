@@ -41,7 +41,6 @@
     // Preferences Inputs
     prefAllergies: document.getElementById('pref-allergies'),
     prefDietaryPreferences: document.getElementById('pref-dietary-preferences'),
-    prefOnHand: document.getElementById('pref-on-hand'),
     prefDiners: document.getElementById('pref-diners'),
     prefMealTime: document.getElementById('pref-meal-time'),
     cuisineGrid: document.getElementById('cuisine-grid'),
@@ -52,6 +51,7 @@
 
     // Planner Inputs
     mealCountInput: document.getElementById('meal-count-input'),
+    planPreferencesInput: document.getElementById('plan-preferences-input'),
     plannerContainer: document.getElementById('planner-container'),
 
     // History Container
@@ -116,7 +116,6 @@
     const prefs = appState.db.preferences || {};
     els.prefAllergies.value = prefs.allergies || "";
     els.prefDietaryPreferences.value = prefs.dietaryPreferences || "";
-    els.prefOnHand.value = prefs.onHandIngredients || "";
     els.prefDiners.value = prefs.dinersCount || 2;
     els.prefMealTime.value = prefs.defaultMealTime || "06:00 PM";
 
@@ -232,7 +231,6 @@
       allergies: els.prefAllergies.value.trim(),
       dietaryPreferences: els.prefDietaryPreferences.value.trim(),
       cuisinePreferences: appState.cuisinePreferences || {},
-      onHandIngredients: els.prefOnHand.value.trim(),
       dinersCount: parseInt(els.prefDiners.value, 10) || 2,
       defaultMealTime: els.prefMealTime.value.trim()
     };
@@ -309,6 +307,7 @@
     }
 
     const count = parseInt(els.mealCountInput.value, 10) || 7;
+    const planPreferences = els.planPreferencesInput ? els.planPreferencesInput.value.trim() : "";
     showLoader("Calling Gemini AI...", "Generating " + count + " dinner recipes. Scaling ingredients for " + (els.prefDiners.value || 2) + " diners. This takes about 10-15 seconds.");
 
     google.script.run
@@ -322,7 +321,7 @@
         hideLoader();
         showToast("Generation failed: " + err.message, true);
       })
-      .generateMealPlanServer(count);
+      .generateMealPlanServer(count, planPreferences);
   }
 
   /**

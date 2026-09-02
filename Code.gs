@@ -31,7 +31,6 @@ function getDatabaseFile() {
         allergies: "No eggs.",
         dietaryPreferences: "Strong preference for high protein and seasonal vegetables.",
         cuisinePreferences: {},
-        onHandIngredients: "",
         dinersCount: 2,
         defaultMealTime: "06:00 PM"
       },
@@ -61,12 +60,6 @@ function loadAppData() {
     if (db.preferences.restrictions !== undefined && db.preferences.dietaryPreferences === undefined) {
       db.preferences.dietaryPreferences = db.preferences.restrictions;
       delete db.preferences.restrictions;
-      updated = true;
-    }
-    // Migrate 'inventory' -> 'onHandIngredients'
-    if (db.preferences.inventory !== undefined && db.preferences.onHandIngredients === undefined) {
-      db.preferences.onHandIngredients = db.preferences.inventory;
-      delete db.preferences.inventory;
       updated = true;
     }
     // Ensure cuisinePreferences exists
@@ -115,7 +108,6 @@ function savePreferences(preferences) {
       allergies: preferences.allergies || "",
       dietaryPreferences: preferences.dietaryPreferences || "",
       cuisinePreferences: (preferences.cuisinePreferences && typeof preferences.cuisinePreferences === 'object') ? preferences.cuisinePreferences : {},
-      onHandIngredients: preferences.onHandIngredients || "",
       dinersCount: parseInt(preferences.dinersCount, 10) || 2,
       defaultMealTime: preferences.defaultMealTime || "06:00 PM"
     };
@@ -160,9 +152,10 @@ function deleteApiKey() {
 /**
  * Calls the Gemini API to generate a weekly meal plan based on preferences.
  */
-function generateMealPlanServer(mealCount) {
+function generateMealPlanServer(mealCount, planPreferences) {
   try {
     mealCount = parseInt(mealCount, 10) || 7;
+    planPreferences = planPreferences ? String(planPreferences).trim() : "";
     
     var userProperties = PropertiesService.getUserProperties();
     var apiKey = userProperties.getProperty('GEMINI_API_KEY');
@@ -200,7 +193,7 @@ function generateMealPlanServer(mealCount) {
                  "- Allergy Constraint: " + (prefs.allergies || "None specified") + "\n" +
                  "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
                  cuisineConstraintText +
-                 (prefs.onHandIngredients ? "- On Hand Ingredients to use: " + prefs.onHandIngredients + "\n\n" : "\n\n") +
+                 (planPreferences ? "- Specific Preferences / Requests for this meal plan: " + planPreferences + "\n\n" : "\n\n") +
                  "Provide a variety of dinner meals. Every recipe must have ingredients, amounts, units, and clear step-by-step instructions. " +
                  "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";
                  

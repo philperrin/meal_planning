@@ -13,14 +13,14 @@
     <!-- Header Area -->
     <header>
       <div class="brand">
-        <span class="brand-icon">✦</span>
+        <span class="brand-icon">🍽️</span>
         <h1>Meal Planning Assistant</h1>
       </div>
       <nav>
-        <button class="nav-tab active" data-view="planner">🍽️ Planner</button>
+        <button class="nav-tab active" data-view="planner">🗓️ Planner</button>
         <button class="nav-tab" data-view="history">📜 History</button>
-        <button class="nav-tab" data-view="preferences">⚙️ Preferences</button>
-        <button class="nav-tab" data-view="settings">🔑 Settings</button>
+        <button class="nav-tab" data-view="preferences">❤️ Preferences</button>
+        <button class="nav-tab" data-view="settings">⚙️ Settings</button>
       </nav>
     </header>
 
@@ -36,7 +36,15 @@
 
       <!-- VIEW: PLANNER -->
       <div class="view active" id="planner-view">
-        <div class="panel" style="margin-bottom: 24px; padding: 20px 24px;">
+        <div class="panel" style="margin-bottom: 24px; padding: 24px;">
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label for="plan-preferences-input">Preferences for this meal plan</label>
+            <div class="input-desc">Input specific ideas or needs for certain meals this week (e.g. 'I\'d like one pizza
+              night that includes margherita pizza')</div>
+            <textarea id="plan-preferences-input"
+              placeholder="Input specific ideas or needs for certain meals this week (e.g. 'I\'d like one pizza night that includes margherita pizza')"
+              rows="2" style="min-height: 70px;"></textarea>
+          </div>
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <label for="meal-count-input"
@@ -71,7 +79,7 @@
       <!-- VIEW: PREFERENCES -->
       <div class="view" id="preferences-view">
         <div class="panel">
-          <h2 class="panel-title">🍽️ Dietary Preferences & Inventory</h2>
+          <h2 class="panel-title">Dietary & Meal Preferences</h2>
 
           <div class="form-group">
             <label for="pref-allergies">Dietary Allergy Constraints</label>
@@ -88,23 +96,20 @@
 
           <!-- Cuisine Preferences Section -->
           <div class="form-group" style="margin-top: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
+            <div
+              style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
               <div>
                 <label style="margin-bottom: 2px;">Cuisine & Meal Style Preferences</label>
-                <div class="input-desc" style="margin-bottom: 0;">Select <strong>Prefer</strong> to prioritize cuisines, <strong>Avoid</strong> to strictly exclude them, or leave blank/neutral.</div>
+                <div class="input-desc" style="margin-bottom: 0;">Select <strong>Prefer</strong> to prioritize cuisines,
+                  <strong>Avoid</strong> to strictly exclude them, or leave blank/neutral.</div>
               </div>
-              <button type="button" class="btn btn-secondary" onclick="handleResetCuisines()" style="padding: 6px 14px; font-size: 12px; height: auto;">↺ Reset All</button>
+              <button type="button" class="btn btn-secondary" onclick="handleResetCuisines()"
+                style="padding: 6px 14px; font-size: 12px; height: auto;">↺ Reset All</button>
             </div>
-            
+
             <div id="cuisine-grid" class="cuisine-grid">
               <!-- Dynamically populated cuisine items -->
             </div>
-          </div>
-
-          <div class="form-group">
-            <label for="pref-on-hand">On Hand Ingredients To Use</label>
-            <div class="input-desc">Highlight ingredients that you have on hand and wish to prioritize.</div>
-            <textarea id="pref-on-hand" placeholder="e.g., Potatoes, onions, chicken breast..."></textarea>
           </div>
 
           <!-- Diner Count and daily prep time row -->
@@ -126,7 +131,7 @@
           </div>
 
           <div style="margin-top: 24px;">
-            <button class="btn" onclick="handleSavePreferences()">💾 Save Preferences</button>
+            <button class="btn" onclick="handleSavePreferences()">Save Preferences</button>
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ A Google Apps Script-based web application that automates meal planning using Go
 
 This application helps you plan weekly meals by:
 - **Generating AI-powered meal plans** using Google Gemini's generative AI
-- **Respecting dietary preferences** including allergies, dietary restrictions, and on-hand ingredients
+- **Respecting dietary preferences** including allergies, dietary restrictions, cuisine styles, and specific requests for each plan
 - **Creating organized documentation** with individual recipe documents and consolidated shopping lists
 - **Integrating with Google Calendar** for meal prep scheduling
 - **Storing meal history** in Google Drive for future reference
@@ -17,7 +17,7 @@ This application helps you plan weekly meals by:
 - Set dietary allergies and preferences
 - Configure **Cuisine & Meal Style Preferences** with 3-state controls (Prefer, Avoid, None) across 12 popular cuisine and diet styles in a clean 2-column layout
 - Specify number of diners for automatic recipe scaling
-- Include ingredients you have on hand
+- Add **per-plan custom preferences and ideas** directly on the Planner tab for each meal plan generation
 - Set default meal preparation time
 
 ### 📝 Automated Recipe Generation
@@ -161,7 +161,10 @@ The application stores data in a JSON file with the following structure:
   "preferences": {
     "allergies": "string",
     "dietaryPreferences": "string",
-    "onHandIngredients": "string",
+    "cuisinePreferences": {
+      "Italian": "prefer",
+      "Chinese": "avoid"
+    },
     "dinersCount": number,
     "defaultMealTime": "HH:MM AM/PM or HH:MM"
   },
