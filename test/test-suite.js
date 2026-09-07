@@ -1121,6 +1121,68 @@ describe('15. Quick-Filter Mood & Constraint Chips (MPA-11)', () => {
   });
 });
 
+// 16. 'Clean Out the Fridge' / Pantry Priority Ingredients Input (MPA-12)
+describe("16. 'Clean Out the Fridge' / Pantry Priority Ingredients Input (MPA-12)", () => {
+  test('Backend prompt injection, DB persistence, and reroll support for pantry priority items', () => {
+    const ctx = createMockGasContext({
+      preferences: { dinersCount: 3, allergies: "None", dietaryPreferences: "" },
+      mealPlan: null,
+      recipeLibrary: {}
+    }, { GEMINI_API_KEY: "test-gemini-key" });
+
+    // 1. buildPantryDirectiveText helper
+    const pantryItems = ["spinach", "rotisserie chicken", "half a cabbage"];
+    const directive = ctx.buildPantryDirectiveText(pantryItems, 2);
+    assert(directive.includes("CRITICAL: You MUST prioritize using the following on-hand ingredients"), "Missing critical priority instruction in pantry directive");
+    assert(directive.includes("spinach, rotisserie chicken, half a cabbage"), "Missing pantry item names in directive");
+    assert(directive.includes("first 2 meals"), "Incorrect meals target count in directive");
+
+    // 2. generateMealPlanServer() accepts pantryIngredients and stores in DB
+    const res = ctx.generateMealPlanServer(3, "Family dinner", [], ["quick"], [], pantryItems);
+    assertEqual(res.success, true);
+    assertDeepEqual(res.db.mealPlan.pantryIngredients, pantryItems, "Meal plan should store pantry ingredients");
+    assertDeepEqual(res.db.preferences.pantryIngredients, pantryItems, "Preferences should store pantry ingredients");
+
+    // Verify Gemini request prompt has pantry directive injected
+    const lastReq = ctx.getLastFetchedRequest();
+    assert(lastReq && lastReq.payload, "Missing Gemini payload");
+    const promptText = lastReq.payload.contents[0].parts[0].text;
+    assert(promptText.includes("CRITICAL: You MUST prioritize using the following on-hand ingredients"), "Gemini prompt missing pantry priority section");
+    assert(promptText.includes("spinach, rotisserie chicken, half a cabbage"), "Gemini prompt missing pantry items list");
+
+    // 3. rerollSingleRecipeServer() accepts pantry items
+    const rerollRes = ctx.rerollSingleRecipeServer(0, res.db.mealPlan.recipes, "", [], pantryItems);
+    assertEqual(rerollRes.success, true);
+    const rerollReq = ctx.getLastFetchedRequest();
+    const rerollPrompt = rerollReq.payload.contents[0].parts[0].text;
+    assert(rerollPrompt.includes("CRITICAL: Prioritize incorporating the following on-hand ingredients"), "Reroll prompt missing pantry priority section");
+    assert(rerollPrompt.includes("spinach, rotisserie chicken, half a cabbage"), "Reroll prompt missing pantry items list");
+  });
+
+  test('Frontend DOM template, CSS styles, and JS client helpers for pantry tags and badges', () => {
+    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+    assert(indexHtml.includes('id="pantry-tags-input"'), "Missing #pantry-tags-input in Index.html");
+    assert(indexHtml.includes('id="pantry-tag-box"'), "Missing #pantry-tag-box in Index.html");
+    assert(indexHtml.includes('id="pantry-pills-container"'), "Missing #pantry-pills-container in Index.html");
+    assert(indexHtml.includes('id="btn-clear-pantry"'), "Missing #btn-clear-pantry in Index.html");
+
+    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+    assert(stylesHtml.includes('.pantry-input-section'), "Missing .pantry-input-section in Styles.html");
+    assert(stylesHtml.includes('.pantry-tag-box'), "Missing .pantry-tag-box in Styles.html");
+    assert(stylesHtml.includes('.pantry-pill'), "Missing .pantry-pill in Styles.html");
+    assert(stylesHtml.includes('.pantry-item-badge'), "Missing .pantry-item-badge in Styles.html");
+    assert(stylesHtml.includes('.recipe-pantry-badge'), "Missing .recipe-pantry-badge in Styles.html");
+
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    assert(jsHtml.includes('setupPantryTagListeners'), "Missing setupPantryTagListeners in JavaScript.html");
+    assert(jsHtml.includes('addPantryIngredient'), "Missing addPantryIngredient in JavaScript.html");
+    assert(jsHtml.includes('removePantryIngredient'), "Missing removePantryIngredient in JavaScript.html");
+    assert(jsHtml.includes('clearAllPantryIngredients'), "Missing clearAllPantryIngredients in JavaScript.html");
+    assert(jsHtml.includes('isPantryItemMatch'), "Missing isPantryItemMatch in JavaScript.html");
+    assert(jsHtml.includes('getMatchedPantryItemsForRecipe'), "Missing getMatchedPantryItemsForRecipe in JavaScript.html");
+  });
+});
+
 // ---------------------------------------------------------
 // Summary Readout & Exit Code Handling
 // ---------------------------------------------------------

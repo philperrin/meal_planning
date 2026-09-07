@@ -22,6 +22,7 @@
     selectedTags: new Set(),
     lockedIndices: new Set(),
     cuisinePreferences: {},
+    pantryIngredients: [],
     reusedRecipes: new Set(),
     historyData: {
       history: [],
@@ -70,6 +71,10 @@
     // Planner Inputs
     mealCountInput: document.getElementById('meal-count-input'),
     planPreferencesInput: document.getElementById('plan-preferences-input'),
+    pantryTagBox: document.getElementById('pantry-tag-box'),
+    pantryPillsContainer: document.getElementById('pantry-pills-container'),
+    pantryTagsInput: document.getElementById('pantry-tags-input'),
+    btnClearPantry: document.getElementById('btn-clear-pantry'),
     plannerContainer: document.getElementById('planner-container'),
     plannerReuseNotice: document.getElementById('planner-reuse-notice'),
 
@@ -87,6 +92,7 @@
   // Initialize App
   document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
+    setupPantryTagListeners();
     try {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('meal_planner_skip_welcome') === 'true') {
         switchView('planner');
@@ -207,6 +213,20 @@
     appState.cuisinePreferences = Object.assign({}, prefs.cuisinePreferences || {});
     renderCuisineGrid();
 
+    // Populate On-Hand Pantry Ingredients (MPA-12)
+    const storedPantry = loadPantryIngredientsFromStorage();
+    if (appState.db.mealPlan && Array.isArray(appState.db.mealPlan.pantryIngredients) && appState.db.mealPlan.pantryIngredients.length > 0) {
+      appState.pantryIngredients = appState.db.mealPlan.pantryIngredients.slice();
+    } else if (prefs && Array.isArray(prefs.pantryIngredients) && prefs.pantryIngredients.length > 0) {
+      appState.pantryIngredients = prefs.pantryIngredients.slice();
+    } else if (storedPantry && storedPantry.length > 0) {
+      appState.pantryIngredients = storedPantry;
+    } else {
+      appState.pantryIngredients = [];
+    }
+    savePantryIngredientsToStorage();
+    renderPantryTags();
+
     // Restore selected constraint tags and locked indices if present in DB
     if (appState.db.mealPlan) {
       if (Array.isArray(appState.db.mealPlan.selectedTags)) {
@@ -251,6 +271,181 @@
       appState.selectedTags.add(tagKey);
     }
     updateFilterChipsUI();
+  }
+
+  /* ==========================================================================
+     MPA-12: 'Clean Out the Fridge' / Pantry Priority Tag Functions
+     ========================================================================== */
+
+  /**
+   * Setup Pantry / Fridge On-Hand Tag Input Listeners
+   */
+  function setupPantryTagListeners() {
+    const input = document.getElementById('pantry-tags-input');
+    if (!input) return;
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ',') {
+        e.preventDefault();
+        const val = input.value;
+        if (val && val.trim()) {
+          addPantryIngredient(val);
+          input.value = '';
+        }
+      } else if (e.key === 'Backspace' && !input.value && appState.pantryIngredients.length > 0) {
+        // Remove last tag on backspace when input is empty
+        removePantryIngredient(appState.pantryIngredients.length - 1);
+      }
+    });
+
+    input.addEventListener('paste', () => {
+      setTimeout(() => {
+        const val = input.value;
+        if (val && val.includes(',')) {
+          addPantryIngredient(val);
+          input.value = '';
+        }
+      }, 10);
+    });
+
+    input.addEventListener('blur', () => {
+      const val = input.value;
+      if (val && val.trim()) {
+        addPantryIngredient(val);
+        input.value = '';
+      }
+    });
+  }
+
+  function focusPantryInput() {
+    const input = document.getElementById('pantry-tags-input');
+    if (input) input.focus();
+  }
+
+  function renderPantryTags() {
+    const container = document.getElementById('pantry-pills-container');
+    const clearBtn = document.getElementById('btn-clear-pantry');
+    if (!container) return;
+
+    let html = '';
+    appState.pantryIngredients.forEach((item, idx) => {
+      html += `
+        <div class="pantry-pill" data-index="${idx}">
+          <span class="pantry-pill-icon">🥕</span>
+          <span class="pantry-pill-text">${escapeHtml(item)}</span>
+          <button type="button" class="pantry-pill-remove" onclick="removePantryIngredient(${idx}, event)" title="Remove '${escapeJSString(item)}'">✕</button>
+        </div>
+      `;
+    });
+    container.innerHTML = html;
+
+    if (clearBtn) {
+      clearBtn.style.display = appState.pantryIngredients.length > 0 ? 'inline-block' : 'none';
+    }
+  }
+
+  function addPantryIngredient(rawName) {
+    if (!rawName) return;
+    const parts = String(rawName).split(',');
+    let addedAny = false;
+
+    parts.forEach(part => {
+      const trimmed = part.trim();
+      if (!trimmed) return;
+      // Case-insensitive duplicate check
+      const lower = trimmed.toLowerCase();
+      const exists = appState.pantryIngredients.some(p => p.toLowerCase() === lower);
+      if (!exists) {
+        appState.pantryIngredients.push(trimmed);
+        addedAny = true;
+      }
+    });
+
+    if (addedAny) {
+      savePantryIngredientsToStorage();
+      renderPantryTags();
+      if (appState.db.mealPlan && appState.db.mealPlan.recipes && appState.db.mealPlan.recipes.length > 0) {
+        renderMealPlan();
+      }
+    }
+  }
+
+  function removePantryIngredient(idx, event) {
+    if (event) event.stopPropagation();
+    if (idx >= 0 && idx < appState.pantryIngredients.length) {
+      appState.pantryIngredients.splice(idx, 1);
+      savePantryIngredientsToStorage();
+      renderPantryTags();
+      if (appState.db.mealPlan && appState.db.mealPlan.recipes && appState.db.mealPlan.recipes.length > 0) {
+        renderMealPlan();
+      }
+    }
+  }
+
+  function clearAllPantryIngredients() {
+    appState.pantryIngredients = [];
+    savePantryIngredientsToStorage();
+    renderPantryTags();
+    if (appState.db.mealPlan && appState.db.mealPlan.recipes && appState.db.mealPlan.recipes.length > 0) {
+      renderMealPlan();
+    }
+    showToast("Cleared on-hand pantry ingredients.");
+  }
+
+  function savePantryIngredientsToStorage() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('meal_planner_pantry_ingredients', JSON.stringify(appState.pantryIngredients));
+      }
+    } catch (e) {}
+  }
+
+  function loadPantryIngredientsFromStorage() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('meal_planner_pantry_ingredients');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  function isPantryItemMatch(ingredientName, pantryList) {
+    if (!ingredientName || !pantryList || !pantryList.length) return false;
+    const cleanIng = ingredientName.toLowerCase().trim();
+    return pantryList.some(p => {
+      const cleanP = p.toLowerCase().trim();
+      if (!cleanP) return false;
+      if (cleanIng.includes(cleanP) || cleanP.includes(cleanIng)) return true;
+      const stopWords = ['and', 'the', 'for', 'with', 'half', 'some', 'cups', 'cup', 'tbsp', 'tsp', 'lbs', 'can', 'cans', 'cloves', 'pinch', 'slices', 'slice'];
+      const words = cleanP.split(/\s+/).filter(w => w.length > 2 && !stopWords.includes(w));
+      return words.some(w => cleanIng.includes(w));
+    });
+  }
+
+  function getMatchedPantryItemsForRecipe(recipe, pantryList) {
+    if (!recipe || !Array.isArray(recipe.ingredients) || !pantryList || !pantryList.length) return [];
+    const matched = new Set();
+    const stopWords = ['and', 'the', 'for', 'with', 'half', 'some', 'cups', 'cup', 'tbsp', 'tsp', 'lbs', 'can', 'cans', 'cloves', 'pinch', 'slices', 'slice'];
+    recipe.ingredients.forEach(ing => {
+      const cleanIng = (ing && ing.name) ? ing.name.toLowerCase().trim() : "";
+      pantryList.forEach(p => {
+        const cleanP = p.toLowerCase().trim();
+        if (!cleanP) return;
+        if (cleanIng.includes(cleanP) || cleanP.includes(cleanIng)) {
+          matched.add(p);
+        } else {
+          const words = cleanP.split(/\s+/).filter(w => w.length > 2 && !stopWords.includes(w));
+          if (words.some(w => cleanIng.includes(w))) {
+            matched.add(p);
+          }
+        }
+      });
+    });
+    return Array.from(matched);
   }
 
   /**
@@ -313,6 +508,7 @@
     const selectedTagsList = Array.from(appState.selectedTags);
     const currentRecipes = appState.db.mealPlan.recipes;
     const oldRecipeName = currentRecipes[idx].name;
+    const pantryList = appState.pantryIngredients || [];
 
     google.script.run
       .withSuccessHandler(res => {
@@ -329,7 +525,7 @@
         }
         showToast("Failed to swap recipe: " + err.message, true);
       })
-      .rerollSingleRecipeServer(idx, currentRecipes, planPreferences, selectedTagsList);
+      .rerollSingleRecipeServer(idx, currentRecipes, planPreferences, selectedTagsList, pantryList);
   }
 
   /**
@@ -1123,6 +1319,7 @@
     const planPreferences = els.planPreferencesInput ? els.planPreferencesInput.value.trim() : "";
     const selectedTagsList = Array.from(appState.selectedTags);
     const lockedList = Array.from(appState.lockedIndices);
+    const pantryList = appState.pantryIngredients || [];
 
     // If all recipes are locked, notify user
     if (appState.db.mealPlan && Array.isArray(appState.db.mealPlan.recipes) && appState.db.mealPlan.recipes.length > 0) {
@@ -1169,7 +1366,7 @@
         hideLoader();
         showToast("Generation failed: " + err.message, true);
       })
-      .generateMealPlanServer(count, planPreferences, reusedList, selectedTagsList, lockedList);
+      .generateMealPlanServer(count, planPreferences, reusedList, selectedTagsList, lockedList, pantryList);
   }
 
   /**
@@ -1287,8 +1484,19 @@
       // Lock status
       const isLocked = appState.lockedIndices.has(idx);
 
+      // Match on-hand pantry ingredients (MPA-12)
+      const activePantryList = (plan.pantryIngredients && Array.isArray(plan.pantryIngredients) && plan.pantryIngredients.length > 0)
+        ? plan.pantryIngredients
+        : (appState.pantryIngredients || []);
+      const matchedPantryItems = getMatchedPantryItemsForRecipe(recipe, activePantryList);
+      const hasPantryMatches = matchedPantryItems.length > 0;
+
       // Build recipe details list
-      const ingredientsList = recipe.ingredients.map(ing => `<li>${escapeHtml(ing.amount)} ${escapeHtml(ing.unit)} ${escapeHtml(ing.name)}</li>`).join('');
+      const ingredientsList = recipe.ingredients.map(ing => {
+        const isPantry = isPantryItemMatch(ing.name, activePantryList);
+        const badgeHtml = isPantry ? ` <span class="pantry-item-badge">🥕 Pantry Item</span>` : '';
+        return `<li>${escapeHtml(ing.amount)} ${escapeHtml(ing.unit)} ${escapeHtml(ing.name)}${badgeHtml}</li>`;
+      }).join('');
       const instructionsList = recipe.instructions.map(step => `<li>${escapeHtml(step)}</li>`).join('');
 
       html += `
@@ -1298,6 +1506,11 @@
             <div class="recipe-title">${escapeHtml(recipe.name)}</div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:2px;">
               <div class="total-time-badge">${totalTimeBadge}</div>
+              ${hasPantryMatches ? `
+                <div class="recipe-pantry-badge" title="Uses on-hand ingredients: ${escapeHtml(matchedPantryItems.join(', '))}">
+                  🥕 Uses: ${escapeHtml(matchedPantryItems.join(', '))}
+                </div>
+              ` : ''}
               <button type="button" class="favorite-btn ${isFav ? 'active' : ''}" 
                 onclick="handleToggleFavorite(event, '${escapeJSString(recipe.name)}', ${escapeJSString(JSON.stringify(recipe))})"
                 title="${isFav ? 'Family Favorite' : 'Star / Bookmark Recipe'}">

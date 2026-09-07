@@ -183,7 +183,8 @@ function savePreferences(preferences) {
       cuisinePreferences: (preferences.cuisinePreferences && typeof preferences.cuisinePreferences === 'object') ? preferences.cuisinePreferences : {},
       dinersCount: parseInt(preferences.dinersCount, 10) || 2,
       defaultMealTime: preferences.defaultMealTime || "06:00 PM",
-      skipWelcomePage: !!preferences.skipWelcomePage
+      skipWelcomePage: !!preferences.skipWelcomePage,
+      pantryIngredients: Array.isArray(preferences.pantryIngredients) ? preferences.pantryIngredients : ((db.preferences && db.preferences.pantryIngredients) || [])
     };
     db.lastUpdated = new Date().toISOString();
     
@@ -467,9 +468,21 @@ function buildTagDirectivesText(selectedTags) {
 }
 
 /**
+ * Builds prompt directive string for prioritizing perishable on-hand/pantry ingredients.
+ */
+function buildPantryDirectiveText(pantryIngredients, targetMealsCount) {
+  if (!Array.isArray(pantryIngredients) || pantryIngredients.length === 0) return "";
+  var cleaned = pantryIngredients.map(function(s) { return String(s).trim(); }).filter(Boolean);
+  if (cleaned.length === 0) return "";
+  var n = targetMealsCount || Math.min(2, cleaned.length);
+  if (n < 1) n = 1;
+  return "- CRITICAL: You MUST prioritize using the following on-hand ingredients across the first " + n + " meals to prevent food waste: [" + cleaned.join(", ") + "]. Ensure these ingredients are explicitly incorporated and clearly listed in those recipes' ingredients lists.\n";
+}
+
+/**
  * Calls the Gemini API to reroll/swap a single recipe at targetIndex, avoiding duplicates of all other meals in the plan.
  */
-function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences, selectedTags) {
+function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences, selectedTags, pantryIngredients) {
   try {
     targetIndex = parseInt(targetIndex, 10);
     if (isNaN(targetIndex) || targetIndex < 0) {
@@ -478,6 +491,7 @@ function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences,
     planPreferences = planPreferences ? String(planPreferences).trim() : "";
     selectedTags = Array.isArray(selectedTags) ? selectedTags : [];
     existingRecipes = Array.isArray(existingRecipes) ? existingRecipes : [];
+    pantryIngredients = Array.isArray(pantryIngredients) ? pantryIngredients.map(function(s){ return String(s).trim(); }).filter(Boolean) : [];
 
     var file = getDatabaseFile();
     var db = JSON.parse(file.getBlob().getDataAsString());
@@ -526,6 +540,10 @@ function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences,
     }
 
     var tagDirectivesText = buildTagDirectivesText(selectedTags);
+    var pantryDirectiveText = "";
+    if (pantryIngredients.length > 0) {
+      pantryDirectiveText = "- CRITICAL: Prioritize incorporating the following on-hand ingredients in this recipe to prevent food waste: [" + pantryIngredients.join(", ") + "].\n";
+    }
 
     var prompt = "You are a professional chef. Generate exactly 1 single replacement dinner recipe. " +
                  "Scale all ingredient quantities in the recipe to feed exactly " + prefs.dinersCount + " diners.\n" +
@@ -533,6 +551,7 @@ function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences,
                  "- Allergy Constraint: " + (prefs.allergies || "None specified") + "\n" +
                  "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
                  cuisineConstraintText +
+                 pantryDirectiveText +
                  avoidText +
                  tagDirectivesText +
                  (planPreferences ? "- Specific Preferences / Requests for this meal plan: " + planPreferences + "\n\n" : "\n\n") +
@@ -647,13 +666,14 @@ function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences,
  * Calls the Gemini API to generate a weekly meal plan based on preferences,
  * supporting ephemeral reuse of past recipes, locked recipe preservation, and constraint tags.
  */
-function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, selectedTags, lockedIndices) {
+function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, selectedTags, lockedIndices, pantryIngredients) {
   try {
     mealCount = parseInt(mealCount, 10) || 7;
     planPreferences = planPreferences ? String(planPreferences).trim() : "";
     reusedRecipeNames = Array.isArray(reusedRecipeNames) ? reusedRecipeNames : [];
     selectedTags = Array.isArray(selectedTags) ? selectedTags : [];
     lockedIndices = Array.isArray(lockedIndices) ? lockedIndices : [];
+    pantryIngredients = Array.isArray(pantryIngredients) ? pantryIngredients.map(function(s){ return String(s).trim(); }).filter(Boolean) : [];
     
     var file = getDatabaseFile();
     var db = JSON.parse(file.getBlob().getDataAsString());
@@ -763,6 +783,7 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, s
       }
 
       var tagDirectivesText = buildTagDirectivesText(selectedTags);
+      var pantryDirectiveText = buildPantryDirectiveText(pantryIngredients, Math.min(remainingCount, pantryIngredients.length > 1 ? 2 : 1));
 
       // Construct the Gemini API Prompt
       var prompt = "You are a professional chef. Generate a dinner meal plan consisting of exactly " + remainingCount + " dinner recipes. " +
@@ -771,6 +792,7 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, s
                    "- Allergy Constraint: " + (prefs.allergies || "None specified") + "\n" +
                    "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
                    cuisineConstraintText +
+                   pantryDirectiveText +
                    reusedAvoidText +
                    tagDirectivesText +
                    (planPreferences ? "- Specific Preferences / Requests for this meal plan: " + planPreferences + "\n\n" : "\n\n") +
@@ -881,10 +903,13 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, s
       recipes: finalRecipes,
       approved: false,
       selectedTags: selectedTags,
+      pantryIngredients: pantryIngredients,
       lockedIndices: Object.keys(lockedMap).map(function(k) { return parseInt(k, 10); }),
       generatedAt: new Date().toISOString(),
       executionResult: null
     };
+    if (!db.preferences) db.preferences = {};
+    db.preferences.pantryIngredients = pantryIngredients;
     db.lastUpdated = new Date().toISOString();
     file.setContent(JSON.stringify(db, null, 2));
     

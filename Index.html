@@ -136,6 +136,30 @@
               night that includes margherita pizza')</div>
             <textarea id="plan-preferences-input" rows="2" style="min-height: 70px;"></textarea>
           </div>
+
+          <!-- MPA-12: 'Clean Out the Fridge' / Pantry Priority Ingredients Input -->
+          <div class="form-group pantry-input-section" style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <label for="pantry-tags-input" style="margin-bottom: 0;">🥕 Use up ingredients on hand</label>
+              <button type="button" id="btn-clear-pantry" class="pantry-clear-btn" style="display: none;" onclick="clearAllPantryIngredients()">✕ Clear all</button>
+            </div>
+            <div class="input-desc">
+              Got perishables in the fridge? Add ingredients you want Gemini to prioritize (e.g. <em>spinach, rotisserie chicken, half a cabbage</em>).
+            </div>
+            <div class="pantry-tag-box" id="pantry-tag-box" onclick="focusPantryInput()">
+              <div class="pantry-pills-container" id="pantry-pills-container"></div>
+              <input type="text" id="pantry-tags-input" class="pantry-input" placeholder="Type ingredient & press Enter or comma..." autocomplete="off">
+            </div>
+            <div class="pantry-quick-suggestions" id="pantry-quick-suggestions">
+              <span class="pantry-suggest-label">Quick add:</span>
+              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Spinach')">+ Spinach</button>
+              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Rotisserie chicken')">+ Rotisserie chicken</button>
+              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Bell peppers')">+ Bell peppers</button>
+              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Cabbage')">+ Cabbage</button>
+              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Mushrooms')">+ Mushrooms</button>
+            </div>
+          </div>
+
           <!-- MPA-11: Quick Mood & Constraint Chips -->
           <div class="planner-chips-section">
             <div class="planner-chips-label">⚡ Quick Mood & Style Presets:</div>
