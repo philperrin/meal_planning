@@ -1848,4 +1848,308 @@
     color: #ffffff;
     box-shadow: 0 1px 4px rgba(207, 92, 92, 0.4);
   }
+
+  /* ==========================================================================
+     MPA-13: Interactive In-App Grocery Checklist Styles
+     ========================================================================== */
+  .shopping-list-panel {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(166, 138, 100, 0.28);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow-md);
+    animation: fadeIn 0.35s ease-out;
+  }
+
+  .shopping-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .shopping-list-header-left {
+    flex: 1 1 320px;
+  }
+
+  .shopping-list-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+
+  .shopping-list-icon {
+    font-size: 22px;
+  }
+
+  .shopping-list-title {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+
+  .shopping-list-badge {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 10px;
+    background: rgba(166, 138, 100, 0.18);
+    border: 1px solid rgba(166, 138, 100, 0.4);
+    color: var(--accent-secondary);
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .shopping-list-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 0;
+  }
+
+  .shopping-list-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .shopping-progress-bar-container {
+    width: 100%;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.35);
+    border-radius: 10px;
+    margin: 16px 0 20px 0;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .shopping-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-secondary);
+    border-radius: 10px;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .shopping-categories-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .shopping-category-card {
+    background: rgba(28, 30, 21, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    transition: var(--transition);
+  }
+
+  .shopping-category-card:hover {
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .shopping-category-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    min-height: 46px;
+    background: rgba(255, 255, 255, 0.02);
+    cursor: pointer;
+    user-select: none;
+    transition: var(--transition);
+  }
+
+  .shopping-category-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .shopping-category-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .shopping-category-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .shopping-category-count {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .shopping-category-chevron {
+    font-size: 11px;
+    color: var(--text-muted);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .shopping-category-card.collapsed .shopping-category-chevron {
+    transform: rotate(-90deg);
+  }
+
+  .shopping-category-card.collapsed .shopping-items-list {
+    display: none;
+  }
+
+  .shopping-items-list {
+    padding: 6px 12px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .shopping-item-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    min-height: 44px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+  }
+
+  .shopping-item-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .shopping-item-row.checked {
+    background: rgba(0, 0, 0, 0.2);
+    opacity: 0.6;
+    border-color: transparent;
+  }
+
+  .shopping-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    margin: 0;
+    position: relative;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .shopping-item-checkbox {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .shopping-custom-checkbox {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+    border: 2px solid rgba(166, 138, 100, 0.45);
+    background: rgba(28, 30, 21, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  .shopping-item-checkbox:checked + .shopping-custom-checkbox {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+  }
+
+  .shopping-item-checkbox:checked + .shopping-custom-checkbox::after {
+    content: "✓";
+    font-size: 13px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1;
+  }
+
+  .shopping-item-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-grow: 1;
+    gap: 12px;
+  }
+
+  .shopping-item-name {
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    text-transform: capitalize;
+    transition: all 0.2s ease;
+  }
+
+  .shopping-item-amount {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--accent-secondary);
+    transition: all 0.2s ease;
+    text-align: right;
+  }
+
+  .shopping-item-row.checked .shopping-item-name,
+  .shopping-item-row.checked .shopping-item-amount {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 768px) {
+    .shopping-list-panel {
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    .shopping-list-header {
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .shopping-list-actions {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .shopping-list-actions button:first-child {
+      grid-column: span 2;
+    }
+
+    .shopping-item-row {
+      padding: 10px 10px;
+    }
+
+    .shopping-item-name {
+      font-size: 14px;
+    }
+
+    .shopping-item-amount {
+      font-size: 13px;
+    }
+  }
 </style>

@@ -680,16 +680,73 @@ function parseTime(timeStr) {
   return { hours: hours, minutes: minutes };
 }
 
+var AISLE_CATEGORIES = [
+  '🥬 Produce',
+  '🥩 Meat & Seafood',
+  '🧀 Dairy & Refrigerated',
+  '🥫 Pantry & Canned',
+  '🧂 Spices & Baking'
+];
+
 /**
- * Consolidated shopping list: smart parses and deduplicates ingredients.
+ * Categorizes an ingredient by grocery aisle / store department.
+ * @param {string} rawName Ingredient name
+ * @return {string} Standard aisle category name
+ */
+function categorizeIngredient(rawName) {
+  var name = (rawName || "").toLowerCase().trim();
+  if (!name) return '🥫 Pantry & Canned';
+
+  // 1. Broths, Stocks, Oils, Sauces, Vinegars, Canned Goods -> Pantry & Canned
+  if (/broth|stock|bouillon|olive oil|vegetable oil|sesame oil|canola oil|cooking spray|vinegar|soy sauce|tamari|worcestershire|fish sauce|hot sauce|sriracha|salsa|tomato sauce|tomato paste|marinara|canned|beans|diced tomato|crushed tomato|coconut milk|peanut butter|honey|maple syrup|mayo|mustard|ketchup|dressing/.test(name)) {
+    return '🥫 Pantry & Canned';
+  }
+
+  // 2. Spices, Powders, Seasonings, Baking
+  if (/powder|seasoning|rub\b|extract|sugar|flour|cornstarch|baking|cocoa|yeast|cinnamon|nutmeg|paprika|cumin|turmeric|coriander|curry powder|cardamom|cayenne|allspice|vanilla|chocolate chip|red pepper flake|chili flake/.test(name)) {
+    return '🧂 Spices & Baking';
+  }
+  if (/\bsalt\b|\bpepper\b|\bpeppercorn\b|\bpeppercorns\b|\bkosher salt\b|\bsea salt\b|\bblack pepper\b/.test(name) && !/bell pepper|chili pepper|jalapeno|poblano|serrano|sweet pepper|banana pepper/.test(name)) {
+    return '🧂 Spices & Baking';
+  }
+
+  // 3. Meat & Seafood
+  if (/chicken|beef|steak|pork|turkey|duck|lamb|veal|bacon|pancetta|prosciutto|sausage|chorizo|ham\b|ribeye|sirloin|ground beef|ground turkey|ground pork|salmon|tuna\b|shrimp|prawn|fish|cod\b|tilapia|halibut|mahi|trout|crab|lobster|scallop|clam|mussel|calamari|squid|anchov|meat/.test(name)) {
+    return '🥩 Meat & Seafood';
+  }
+
+  // 4. Dairy & Refrigerated (and plant-based dairy substitutes)
+  if (/milk|butter|cheese|cheddar|mozzarella|parmesan|parmigiano|ricotta|feta|gouda|swiss|provolone|brie|pecorino|yogurt|cream|sour cream|half and half|half & half|egg|eggs|egg white|egg yolk|tofu|tempeh|ghee|margarine|cream cheese|cottage cheese|mascarpone|queso/.test(name)) {
+    return '🧀 Dairy & Refrigerated';
+  }
+
+  // 5. Fresh Produce
+  if (/garlic|onion|shallot|leek|scallion|ginger|tomato|potato|potatoes|sweet potato|lettuce|spinach|kale|arugula|cabbage|bok choy|chard|celery|carrot|bell pepper|jalapeno|chili|poblano|serrano|avocado|cucumber|zucchini|squash|broccoli|cauliflower|asparagus|mushroom|green bean|pea\b|peas\b|snap pea|snow pea|eggplant|corn\b|radish|beet|lemon|lime|orange|apple|banana|berry|berries|strawberry|blueberry|raspberry|blackberry|mango|pineapple|grape|peach|pear|melon|watermelon|cilantro|parsley|basil|rosemary|thyme|mint|dill|sage\b|tarragon|lemongrass|sprout|herb/.test(name)) {
+    return '🥬 Produce';
+  }
+
+  // 6. Grains, Pasta, Bread, Canned & Pantry fallback
+  if (/pasta|spaghetti|penne|noodle|rice|quinoa|oat|bread|tortilla|pita|cracker|panko|breadcrumb|chip|olive|caper|nut\b|nuts\b|almond|walnut|peanut|cashew|pecan|pine nut|seed|sunflower|sesame/.test(name)) {
+    return '🥫 Pantry & Canned';
+  }
+
+  // Default fallback
+  return '🥫 Pantry & Canned';
+}
+
+/**
+ * Consolidated shopping list: smart parses and deduplicates ingredients,
+ * enriched with aisle department categorization.
  */
 function consolidateShoppingList(recipes) {
   var list = {};
   recipes.forEach(function(recipe) {
+    if (!recipe.ingredients) return;
     recipe.ingredients.forEach(function(ing) {
-      var name = ing.name.toLowerCase().trim();
-      var amount = parseFloat(ing.amount);
-      var unit = ing.unit.toLowerCase().trim();
+      var name = (ing.name || "").toLowerCase().trim();
+      if (!name) return;
+      var amount = parseFloat(ing.amount) || 0;
+      var unit = (ing.unit || "").toLowerCase().trim();
       
       if (!list[name]) {
         list[name] = [];
@@ -707,23 +764,26 @@ function consolidateShoppingList(recipes) {
       var found = false;
       for (var i = 0; i < merged.length; i++) {
         if (merged[i].unit === item.unit) {
-          merged[i].amount += item.amount;
+          merged[i].amount = Math.round((merged[i].amount + item.amount) * 100) / 100;
           found = true;
           break;
         }
       }
       if (!found) {
-        merged.push({ amount: item.amount, unit: item.unit });
+        merged.push({ amount: Math.round(item.amount * 100) / 100, unit: item.unit });
       }
     });
     
+    var category = categorizeIngredient(name);
+    
     consolidated.push({
       name: name,
+      category: category,
       amounts: merged
     });
   }
   
-  // Sort alphabetically
+  // Sort alphabetically by name
   consolidated.sort(function(a, b) {
     return a.name.localeCompare(b.name);
   });
@@ -850,12 +910,12 @@ function approveMealPlanServer(approvedMealsWithDates) {
         body.appendParagraph("Diners Scaled For: " + prefs.dinersCount).setBold(true);
         
         body.appendParagraph("Ingredients").setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        recipe.ingredients.forEach(function(ing) {
+        (recipe.ingredients || []).forEach(function(ing) {
           body.appendListItem(ing.amount + " " + ing.unit + " " + ing.name);
         });
         
         body.appendParagraph("Instructions").setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        recipe.instructions.forEach(function(step, stepIdx) {
+        (recipe.instructions || []).forEach(function(step, stepIdx) {
           body.appendListItem((stepIdx + 1) + ". " + step);
         });
         
@@ -872,11 +932,11 @@ function approveMealPlanServer(approvedMealsWithDates) {
       // Cache structured recipe in db.recipeLibrary
       db.recipeLibrary[recipe.name] = {
         name: recipe.name,
-        description: recipe.description,
-        prepTime: recipe.prepTime,
-        cookTime: recipe.cookTime,
-        ingredients: recipe.ingredients,
-        instructions: recipe.instructions,
+        description: recipe.description || "",
+        prepTime: recipe.prepTime || "15m",
+        cookTime: recipe.cookTime || "20m",
+        ingredients: recipe.ingredients || [],
+        instructions: recipe.instructions || [],
         docUrl: docUrl,
         docId: docId,
         originalDiners: prefs.dinersCount,
@@ -901,13 +961,13 @@ function approveMealPlanServer(approvedMealsWithDates) {
       var endTime = new Date(year, month, day, timeDetails.hours + 1, timeDetails.minutes, 0);
       
       var description = "Prep & Cook: " + recipe.name + "\n\n" +
-                        recipe.description + "\n\n" +
+                        (recipe.description || "") + "\n\n" +
                         "Diners: " + prefs.dinersCount + "\n" +
-                        "Prep Time: " + recipe.prepTime + " | Cook Time: " + recipe.cookTime + "\n\n" +
+                        "Prep Time: " + (recipe.prepTime || "15m") + " | Cook Time: " + (recipe.cookTime || "20m") + "\n\n" +
                         "Ingredients:\n" +
-                        recipe.ingredients.map(function(i) { return "- " + i.amount + " " + i.unit + " " + i.name; }).join("\n") + "\n\n" +
+                        (recipe.ingredients || []).map(function(i) { return "- " + i.amount + " " + i.unit + " " + i.name; }).join("\n") + "\n\n" +
                         "Instructions:\n" +
-                        recipe.instructions.map(function(step, idx) { return (idx + 1) + ". " + step; }).join("\n") + "\n\n" +
+                        (recipe.instructions || []).map(function(step, idx) { return (idx + 1) + ". " + step; }).join("\n") + "\n\n" +
                         "Recipe Document: " + docUrl;
                         
       calendar.createEvent("Meal Prep: " + recipe.name, startTime, endTime, {
@@ -935,10 +995,27 @@ function approveMealPlanServer(approvedMealsWithDates) {
     slBody.appendParagraph("Diners Scaled For: " + prefs.dinersCount).setBold(true);
     slBody.appendParagraph("Recipes included: " + rawSelectedRecipes.map(function(r) { return r.name; }).join(", "));
     
-    slBody.appendParagraph("Items to Buy").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    slBody.appendParagraph("Items to Buy by Store Section").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    
+    // Group items by category for document rendering
+    var categorizedItems = {};
+    AISLE_CATEGORIES.forEach(function(cat) { categorizedItems[cat] = []; });
+    
     consolidatedList.forEach(function(item) {
-      var amountStr = item.amounts.map(function(a) { return a.amount + " " + a.unit; }).join(", ");
-      slBody.appendListItem(item.name.charAt(0).toUpperCase() + item.name.slice(1) + ": " + amountStr);
+      var cat = item.category || '🥫 Pantry & Canned';
+      if (!categorizedItems[cat]) categorizedItems[cat] = [];
+      categorizedItems[cat].push(item);
+    });
+    
+    AISLE_CATEGORIES.forEach(function(cat) {
+      var items = categorizedItems[cat] || [];
+      if (items.length > 0) {
+        slBody.appendParagraph(cat).setHeading(DocumentApp.ParagraphHeading.HEADING3);
+        items.forEach(function(item) {
+          var amountStr = item.amounts.map(function(a) { return a.amount + " " + a.unit; }).join(", ");
+          slBody.appendListItem(item.name.charAt(0).toUpperCase() + item.name.slice(1) + ": " + amountStr);
+        });
+      }
     });
     
     shoppingListDoc.saveAndClose();
@@ -949,10 +1026,12 @@ function approveMealPlanServer(approvedMealsWithDates) {
     
     executionResult.shoppingListDocUrl = shoppingListDoc.getUrl();
     executionResult.shoppingListDocName = shoppingListDocName;
+    executionResult.shoppingList = consolidatedList;
     
     // Save state back to DB
     db.mealPlan.approved = true;
     db.mealPlan.executionResult = executionResult;
+    db.mealPlan.shoppingList = consolidatedList;
     db.lastUpdated = new Date().toISOString();
     file.setContent(JSON.stringify(db, null, 2));
     

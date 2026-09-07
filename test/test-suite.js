@@ -487,7 +487,15 @@ describe('4. Client-Side Utilities & Script Handlers (JavaScript.html)', () => {
       'toggleReuseRecipe',
       'clearReusedRecipes',
       'renderStarRating',
-      'handleSetRating'
+      'handleSetRating',
+      'categorizeIngredient',
+      'consolidateShoppingListClient',
+      'renderShoppingListHtml',
+      'handleToggleShoppingItem',
+      'handleToggleShoppingCategory',
+      'handleToggleAllShoppingCategories',
+      'handleResetShoppingChecklist',
+      'handleCopyShoppingList'
     ];
     requiredClientFunctions.forEach(fnName => {
       assert(jsHtml.includes(`function ${fnName}`), `${fnName} function missing in JavaScript.html`);
@@ -846,6 +854,118 @@ describe('11. Family Favorites 1-Click Plan Insertion & Live Plan Editing (MPA-1
     assertEqual(removeRes.success, true);
     assertEqual(removeRes.db.mealPlan.recipes.length, 1);
     assertEqual(removeRes.db.mealPlan.recipes[0].name, "Favorite Pasta");
+  });
+});
+
+// 12. Interactive In-App Grocery Checklist & Aisle Sorting (MPA-13)
+describe('12. Interactive In-App Grocery Checklist & Aisle Sorting (MPA-13)', () => {
+  test('Backend and Frontend accurately categorize ingredients, sort by aisle, format markdown text, and generate HTML', () => {
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
+    const clientCtx = createMockBrowserContext();
+    vm.runInContext(scriptMatch[1], clientCtx);
+
+    const backendCtx = createMockGasContext();
+
+    // 1. Categorization across all departments
+    const testCases = [
+      { name: "Fresh Garlic Cloves", expected: "🥬 Produce" },
+      { name: "Yellow Onion", expected: "🥬 Produce" },
+      { name: "Baby Spinach", expected: "🥬 Produce" },
+      { name: "Chicken Breast", expected: "🥩 Meat & Seafood" },
+      { name: "Ground Beef 80/20", expected: "🥩 Meat & Seafood" },
+      { name: "Salmon Fillet", expected: "🥩 Meat & Seafood" },
+      { name: "Heavy Whipping Cream", expected: "🧀 Dairy & Refrigerated" },
+      { name: "Parmesan Cheese", expected: "🧀 Dairy & Refrigerated" },
+      { name: "Large Eggs", expected: "🧀 Dairy & Refrigerated" },
+      { name: "Extra Virgin Olive Oil", expected: "🥫 Pantry & Canned" },
+      { name: "Penne Pasta", expected: "🥫 Pantry & Canned" },
+      { name: "Chicken Broth", expected: "🥫 Pantry & Canned" },
+      { name: "Diced Tomatoes", expected: "🥫 Pantry & Canned" },
+      { name: "Black Pepper", expected: "🧂 Spices & Baking" },
+      { name: "Kosher Salt", expected: "🧂 Spices & Baking" },
+      { name: "Garlic Powder", expected: "🧂 Spices & Baking" },
+      { name: "Ground Cumin", expected: "🧂 Spices & Baking" }
+    ];
+
+    testCases.forEach(tc => {
+      assertEqual(backendCtx.categorizeIngredient(tc.name), tc.expected, `Backend categorization mismatch for "${tc.name}"`);
+      assertEqual(clientCtx.categorizeIngredient(tc.name), tc.expected, `Client categorization mismatch for "${tc.name}"`);
+    });
+
+    // 2. consolidateShoppingList returns category property
+    const recipes = [
+      {
+        name: "Garlic Chicken",
+        ingredients: [
+          { name: "Garlic", amount: 4, unit: "cloves" },
+          { name: "Chicken Breast", amount: 1.5, unit: "lbs" },
+          { name: "Olive Oil", amount: 2, unit: "tbsp" },
+          { name: "Black Pepper", amount: 0.5, unit: "tsp" }
+        ]
+      }
+    ];
+
+    const backendConsolidated = backendCtx.consolidateShoppingList(recipes);
+    assertEqual(backendConsolidated.length, 4);
+    const garlicItem = backendConsolidated.find(i => i.name === 'garlic');
+    const chickenItem = backendConsolidated.find(i => i.name === 'chicken breast');
+    const oilItem = backendConsolidated.find(i => i.name === 'olive oil');
+    const pepperItem = backendConsolidated.find(i => i.name === 'black pepper');
+
+    assertEqual(garlicItem.category, '🥬 Produce');
+    assertEqual(chickenItem.category, '🥩 Meat & Seafood');
+    assertEqual(oilItem.category, '🥫 Pantry & Canned');
+    assertEqual(pepperItem.category, '🧂 Spices & Baking');
+
+    // 3. Client formatShoppingListText generates markdown text with headers and bullets
+    const mockPlan = {
+      generatedAt: "2026-09-07T12:00:00Z",
+      approved: true,
+      recipes: recipes,
+      executionResult: {
+        shoppingList: backendConsolidated,
+        shoppingListDocName: "20260907 - Shopping List",
+        shoppingListDocUrl: "https://docs.google.com/test",
+        recipeDocs: []
+      }
+    };
+
+    const formattedText = clientCtx.formatShoppingListText(mockPlan);
+    assert(formattedText.includes("🛒 Grocery Shopping List"), "Missing title in formatted list");
+    assert(formattedText.includes("🥬 Produce"), "Missing Produce category header");
+    assert(formattedText.includes("🥩 Meat & Seafood"), "Missing Meat category header");
+    assert(formattedText.includes("🥫 Pantry & Canned"), "Missing Pantry category header");
+    assert(formattedText.includes("🧂 Spices & Baking"), "Missing Spices category header");
+    assert(formattedText.includes("- Garlic: 4 cloves"), "Missing formatted garlic bullet");
+    assert(formattedText.includes("- Chicken breast: 1.5 lbs"), "Missing formatted chicken bullet");
+
+    // 4. Client renderShoppingListHtml generates interactive HTML with category cards and custom checkboxes
+    const htmlOutput = clientCtx.renderShoppingListHtml(mockPlan);
+    assert(htmlOutput.includes('id="shopping-list-section"'), "Missing shopping list section ID");
+    assert(htmlOutput.includes('class="shopping-list-panel"'), "Missing shopping list panel class");
+    assert(htmlOutput.includes('id="btn-copy-shopping-list"'), "Missing copy list button");
+    assert(htmlOutput.includes('id="btn-reset-shopping-checklist"'), "Missing reset checklist button");
+    assert(htmlOutput.includes('class="shopping-progress-bar"'), "Missing progress bar element");
+    assert(htmlOutput.includes('class="shopping-item-checkbox"'), "Missing item checkboxes");
+    assert(htmlOutput.includes('class="shopping-custom-checkbox"'), "Missing custom checkbox styling element");
+
+    // 5. approveMealPlanServer attaches shoppingList to executionResult and db.mealPlan
+    const approvedList = [{ name: "Garlic Chicken", date: "2026-09-08" }];
+    const approveDb = {
+      preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
+      mealPlan: {
+        generatedAt: "2026-09-07T12:00:00Z",
+        recipes: recipes
+      },
+      recipeLibrary: {}
+    };
+    const approveCtx = createMockGasContext(approveDb);
+    const approveRes = approveCtx.approveMealPlanServer(approvedList);
+    assertEqual(approveRes.success, true);
+    assert(approveRes.db.mealPlan.executionResult.shoppingList !== undefined, "shoppingList missing from executionResult");
+    assertEqual(approveRes.db.mealPlan.executionResult.shoppingList.length, 4);
+    assertEqual(approveRes.db.mealPlan.shoppingList.length, 4);
   });
 });
 

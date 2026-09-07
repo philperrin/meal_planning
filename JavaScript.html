@@ -342,6 +342,487 @@
     return String(str).replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
   }
 
+  /* ==========================================================================
+     MPA-13: Interactive In-App Grocery Checklist & Aisle Sorting
+     ========================================================================== */
+  const AISLE_CATEGORIES = [
+    '🥬 Produce',
+    '🥩 Meat & Seafood',
+    '🧀 Dairy & Refrigerated',
+    '🥫 Pantry & Canned',
+    '🧂 Spices & Baking'
+  ];
+
+  /**
+   * Categorizes an ingredient by grocery store aisle / department.
+   */
+  function categorizeIngredient(rawName) {
+    const name = (rawName || "").toLowerCase().trim();
+    if (!name) return '🥫 Pantry & Canned';
+
+    // 1. Broths, Stocks, Oils, Sauces, Vinegars, Canned Goods -> Pantry & Canned
+    if (/broth|stock|bouillon|olive oil|vegetable oil|sesame oil|canola oil|cooking spray|vinegar|soy sauce|tamari|worcestershire|fish sauce|hot sauce|sriracha|salsa|tomato sauce|tomato paste|marinara|canned|beans|diced tomato|crushed tomato|coconut milk|peanut butter|honey|maple syrup|mayo|mustard|ketchup|dressing/.test(name)) {
+      return '🥫 Pantry & Canned';
+    }
+
+    // 2. Spices, Powders, Seasonings, Baking
+    if (/powder|seasoning|rub\b|extract|sugar|flour|cornstarch|baking|cocoa|yeast|cinnamon|nutmeg|paprika|cumin|turmeric|coriander|curry powder|cardamom|cayenne|allspice|vanilla|chocolate chip|red pepper flake|chili flake/.test(name)) {
+      return '🧂 Spices & Baking';
+    }
+    if (/\bsalt\b|\bpepper\b|\bpeppercorn\b|\bpeppercorns\b|\bkosher salt\b|\bsea salt\b|\bblack pepper\b/.test(name) && !/bell pepper|chili pepper|jalapeno|poblano|serrano|sweet pepper|banana pepper/.test(name)) {
+      return '🧂 Spices & Baking';
+    }
+
+    // 3. Meat & Seafood
+    if (/chicken|beef|steak|pork|turkey|duck|lamb|veal|bacon|pancetta|prosciutto|sausage|chorizo|ham\b|ribeye|sirloin|ground beef|ground turkey|ground pork|salmon|tuna\b|shrimp|prawn|fish|cod\b|tilapia|halibut|mahi|trout|crab|lobster|scallop|clam|mussel|calamari|squid|anchov|meat/.test(name)) {
+      return '🥩 Meat & Seafood';
+    }
+
+    // 4. Dairy & Refrigerated (and plant-based dairy substitutes)
+    if (/milk|butter|cheese|cheddar|mozzarella|parmesan|parmigiano|ricotta|feta|gouda|swiss|provolone|brie|pecorino|yogurt|cream|sour cream|half and half|half & half|egg|eggs|egg white|egg yolk|tofu|tempeh|ghee|margarine|cream cheese|cottage cheese|mascarpone|queso/.test(name)) {
+      return '🧀 Dairy & Refrigerated';
+    }
+
+    // 5. Fresh Produce
+    if (/garlic|onion|shallot|leek|scallion|ginger|tomato|potato|potatoes|sweet potato|lettuce|spinach|kale|arugula|cabbage|bok choy|chard|celery|carrot|bell pepper|jalapeno|chili|poblano|serrano|avocado|cucumber|zucchini|squash|broccoli|cauliflower|asparagus|mushroom|green bean|pea\b|peas\b|snap pea|snow pea|eggplant|corn\b|radish|beet|lemon|lime|orange|apple|banana|berry|berries|strawberry|blueberry|raspberry|blackberry|mango|pineapple|grape|peach|pear|melon|watermelon|cilantro|parsley|basil|rosemary|thyme|mint|dill|sage\b|tarragon|lemongrass|sprout|herb/.test(name)) {
+      return '🥬 Produce';
+    }
+
+    // 6. Grains, Pasta, Bread, Canned & Pantry fallback
+    if (/pasta|spaghetti|penne|noodle|rice|quinoa|oat|bread|tortilla|pita|cracker|panko|breadcrumb|chip|olive|caper|nut\b|nuts\b|almond|walnut|peanut|cashew|pecan|pine nut|seed|sunflower|sesame/.test(name)) {
+      return '🥫 Pantry & Canned';
+    }
+
+    // Default fallback
+    return '🥫 Pantry & Canned';
+  }
+
+  /**
+   * Consolidate and deduplicate ingredients client-side
+   */
+  function consolidateShoppingListClient(recipes) {
+    if (!Array.isArray(recipes)) return [];
+    const list = {};
+    recipes.forEach(recipe => {
+      if (!recipe.ingredients) return;
+      recipe.ingredients.forEach(ing => {
+        const name = (ing.name || "").toLowerCase().trim();
+        if (!name) return;
+        const amount = parseFloat(ing.amount) || 0;
+        const unit = (ing.unit || "").toLowerCase().trim();
+        if (!list[name]) list[name] = [];
+        list[name].push({ amount, unit });
+      });
+    });
+
+    const consolidated = [];
+    for (const name in list) {
+      const items = list[name];
+      const merged = [];
+      items.forEach(item => {
+        let found = false;
+        for (let i = 0; i < merged.length; i++) {
+          if (merged[i].unit === item.unit) {
+            merged[i].amount = Math.round((merged[i].amount + item.amount) * 100) / 100;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          merged.push({ amount: Math.round(item.amount * 100) / 100, unit: item.unit });
+        }
+      });
+      consolidated.push({
+        name: name,
+        category: categorizeIngredient(name),
+        amounts: merged
+      });
+    }
+
+    consolidated.sort((a, b) => a.name.localeCompare(b.name));
+    return consolidated;
+  }
+
+  /**
+   * Key for localStorage persistence of checklist states
+   */
+  function getShoppingChecklistStorageKey(plan) {
+    const planId = plan && (plan.generatedAt || (plan.executionResult && plan.executionResult.shoppingListDocName) || 'active');
+    return 'mp_checklist_' + String(planId).replace(/[^a-zA-Z0-9]/g, '_');
+  }
+
+  function getStoredShoppingChecklist(plan) {
+    try {
+      const key = getShoppingChecklistStorageKey(plan);
+      const raw = localStorage.getItem(key);
+      if (!raw) return new Set();
+      const parsed = JSON.parse(raw);
+      return new Set(Array.isArray(parsed) ? parsed : []);
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  function saveStoredShoppingChecklist(plan, checkedSet) {
+    try {
+      const key = getShoppingChecklistStorageKey(plan);
+      localStorage.setItem(key, JSON.stringify(Array.from(checkedSet)));
+    } catch (e) {
+      console.warn("Could not save checklist state to localStorage: ", e);
+    }
+  }
+
+  /**
+   * Render HTML markup for the In-App Interactive Grocery Checklist
+   */
+  function renderShoppingListHtml(plan) {
+    if (!plan) return '';
+    const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
+                         plan.shoppingList ||
+                         consolidateShoppingListClient(plan.recipes);
+    
+    if (!shoppingList || shoppingList.length === 0) return '';
+
+    const checkedSet = getStoredShoppingChecklist(plan);
+    const totalItems = shoppingList.length;
+    let checkedCount = 0;
+
+    // Group items by category
+    const categorized = {};
+    AISLE_CATEGORIES.forEach(cat => { categorized[cat] = []; });
+
+    shoppingList.forEach(item => {
+      const cat = item.category || categorizeIngredient(item.name);
+      if (!categorized[cat]) categorized[cat] = [];
+      categorized[cat].push(item);
+      if (checkedSet.has(item.name)) {
+        checkedCount++;
+      }
+    });
+
+    const progressPct = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0;
+
+    let categoriesHtml = '';
+    AISLE_CATEGORIES.forEach(cat => {
+      const items = categorized[cat] || [];
+      if (items.length === 0) return;
+
+      const catCheckedCount = items.filter(it => checkedSet.has(it.name)).length;
+      const catTotal = items.length;
+      const catSlug = escapeHtmlId(cat);
+
+      let itemsHtml = '';
+      items.forEach(item => {
+        const isChecked = checkedSet.has(item.name);
+        const amountsStr = (item.amounts || []).map(a => `${a.amount} ${a.unit}`).join(', ');
+        const itemSlug = escapeHtmlId(item.name);
+
+        itemsHtml += `
+          <div class="shopping-item-row ${isChecked ? 'checked' : ''}" 
+               id="shop-row-${itemSlug}"
+               onclick="handleToggleShoppingItem(event, '${escapeJSString(item.name)}')">
+            <label class="shopping-checkbox-label" onclick="event.stopPropagation()">
+              <input type="checkbox" class="shopping-item-checkbox" 
+                     id="shop-check-${itemSlug}" 
+                     ${isChecked ? 'checked' : ''} 
+                     onchange="handleToggleShoppingItemCheckbox('${escapeJSString(item.name)}', this.checked)">
+              <span class="shopping-custom-checkbox"></span>
+            </label>
+            <div class="shopping-item-content">
+              <span class="shopping-item-name">${escapeHtml(item.name)}</span>
+              <span class="shopping-item-amount">${escapeHtml(amountsStr)}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      categoriesHtml += `
+        <div class="shopping-category-card" id="shop-cat-${catSlug}">
+          <div class="shopping-category-header" onclick="handleToggleShoppingCategory('${catSlug}')">
+            <div class="shopping-category-title-group">
+              <span class="shopping-category-name">${escapeHtml(cat)}</span>
+              <span class="shopping-category-count" id="cat-count-${catSlug}">
+                ${catTotal} ${catTotal === 1 ? 'item' : 'items'} (${catCheckedCount} checked)
+              </span>
+            </div>
+            <span class="shopping-category-chevron">▼</span>
+          </div>
+          <div class="shopping-items-list" id="items-list-${catSlug}">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    return `
+      <div class="shopping-list-panel" id="shopping-list-section">
+        <div class="shopping-list-header">
+          <div class="shopping-list-header-left">
+            <div class="shopping-list-title-row">
+              <span class="shopping-list-icon">🛒</span>
+              <h3 class="shopping-list-title">Interactive Grocery Checklist</h3>
+              <span class="shopping-list-badge" id="shopping-list-progress-badge">
+                ${checkedCount} of ${totalItems} checked (${progressPct}%)
+              </span>
+            </div>
+            <p class="shopping-list-subtitle">
+              Aisle-sorted checklist for walking supermarket aisles or pantry pre-checks. Check off items with instant strike-through.
+            </p>
+          </div>
+          <div class="shopping-list-actions">
+            <button type="button" class="btn btn-gold btn-sm" id="btn-copy-shopping-list" onclick="handleCopyShoppingList()">
+              <span class="btn-icon">📋</span>
+              <span id="btn-copy-shopping-text">Copy for Notes / Instacart</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-reset-shopping-checklist" onclick="handleResetShoppingChecklist()">
+              <span class="btn-icon">↺</span>
+              <span>Reset Checks</span>
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-toggle-all-categories" onclick="handleToggleAllShoppingCategories()">
+              <span id="toggle-all-cat-label">Collapse All</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="shopping-progress-bar-container">
+          <div class="shopping-progress-bar" id="shopping-progress-bar" style="width: ${progressPct}%;"></div>
+        </div>
+
+        <div class="shopping-categories-container">
+          ${categoriesHtml}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Toggle checked state for a shopping list item by clicking row
+   */
+  function handleToggleShoppingItem(event, itemName) {
+    if (event) event.stopPropagation();
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+    const checkedSet = getStoredShoppingChecklist(plan);
+    const isCurrentlyChecked = checkedSet.has(itemName);
+    const nextState = !isCurrentlyChecked;
+
+    if (nextState) {
+      checkedSet.add(itemName);
+    } else {
+      checkedSet.delete(itemName);
+    }
+    saveStoredShoppingChecklist(plan, checkedSet);
+
+    // Update DOM row & checkbox
+    const itemSlug = escapeHtmlId(itemName);
+    const rowEl = document.getElementById(`shop-row-${itemSlug}`);
+    const checkEl = document.getElementById(`shop-check-${itemSlug}`);
+    if (rowEl) rowEl.classList.toggle('checked', nextState);
+    if (checkEl) checkEl.checked = nextState;
+
+    updateShoppingListProgressUI(plan, checkedSet);
+  }
+
+  /**
+   * Direct change event from item checkbox input
+   */
+  function handleToggleShoppingItemCheckbox(itemName, isChecked) {
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+    const checkedSet = getStoredShoppingChecklist(plan);
+    if (isChecked) {
+      checkedSet.add(itemName);
+    } else {
+      checkedSet.delete(itemName);
+    }
+    saveStoredShoppingChecklist(plan, checkedSet);
+
+    const itemSlug = escapeHtmlId(itemName);
+    const rowEl = document.getElementById(`shop-row-${itemSlug}`);
+    if (rowEl) rowEl.classList.toggle('checked', isChecked);
+
+    updateShoppingListProgressUI(plan, checkedSet);
+  }
+
+  /**
+   * Update progress bar, badges, and category item counts
+   */
+  function updateShoppingListProgressUI(plan, checkedSet) {
+    const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
+                         plan.shoppingList ||
+                         consolidateShoppingListClient(plan.recipes);
+    if (!shoppingList) return;
+
+    const totalItems = shoppingList.length;
+    let checkedCount = 0;
+
+    const categorized = {};
+    AISLE_CATEGORIES.forEach(cat => { categorized[cat] = []; });
+    shoppingList.forEach(item => {
+      const cat = item.category || categorizeIngredient(item.name);
+      if (!categorized[cat]) categorized[cat] = [];
+      categorized[cat].push(item);
+      if (checkedSet.has(item.name)) checkedCount++;
+    });
+
+    const progressPct = totalItems > 0 ? Math.round((checkedCount / totalItems) * 100) : 0;
+
+    const barEl = document.getElementById('shopping-progress-bar');
+    if (barEl) barEl.style.width = `${progressPct}%`;
+
+    const badgeEl = document.getElementById('shopping-list-progress-badge');
+    if (badgeEl) badgeEl.textContent = `${checkedCount} of ${totalItems} checked (${progressPct}%)`;
+
+    AISLE_CATEGORIES.forEach(cat => {
+      const items = categorized[cat] || [];
+      if (items.length === 0) return;
+      const catSlug = escapeHtmlId(cat);
+      const catCheckedCount = items.filter(it => checkedSet.has(it.name)).length;
+      const countEl = document.getElementById(`cat-count-${catSlug}`);
+      if (countEl) {
+        countEl.textContent = `${items.length} ${items.length === 1 ? 'item' : 'items'} (${catCheckedCount} checked)`;
+      }
+    });
+  }
+
+  /**
+   * Expand / Collapse an individual category accordion
+   */
+  function handleToggleShoppingCategory(catSlug) {
+    const cardEl = document.getElementById(`shop-cat-${catSlug}`);
+    if (cardEl) {
+      cardEl.classList.toggle('collapsed');
+    }
+  }
+
+  /**
+   * Expand / Collapse all categories at once
+   */
+  let allShoppingCatsCollapsed = false;
+  function handleToggleAllShoppingCategories() {
+    allShoppingCatsCollapsed = !allShoppingCatsCollapsed;
+    const cards = document.querySelectorAll('.shopping-category-card');
+    cards.forEach(card => {
+      card.classList.toggle('collapsed', allShoppingCatsCollapsed);
+    });
+    const labelEl = document.getElementById('toggle-all-cat-label');
+    if (labelEl) {
+      labelEl.textContent = allShoppingCatsCollapsed ? 'Expand All' : 'Collapse All';
+    }
+  }
+
+  /**
+   * Reset all checks for the active plan's checklist
+   */
+  function handleResetShoppingChecklist() {
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+    const emptySet = new Set();
+    saveStoredShoppingChecklist(plan, emptySet);
+
+    const rows = document.querySelectorAll('.shopping-item-row');
+    rows.forEach(r => r.classList.remove('checked'));
+    const checkboxes = document.querySelectorAll('.shopping-item-checkbox');
+    checkboxes.forEach(c => { c.checked = false; });
+
+    updateShoppingListProgressUI(plan, emptySet);
+    showToast("Checklist items reset!");
+  }
+
+  /**
+   * Format grocery list as clean plain text / Markdown grouped by aisle
+   */
+  function formatShoppingListText(plan) {
+    const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
+                         plan.shoppingList ||
+                         consolidateShoppingListClient(plan.recipes);
+    if (!shoppingList || shoppingList.length === 0) return '';
+
+    const categorized = {};
+    AISLE_CATEGORIES.forEach(cat => { categorized[cat] = []; });
+    shoppingList.forEach(item => {
+      const cat = item.category || categorizeIngredient(item.name);
+      if (!categorized[cat]) categorized[cat] = [];
+      categorized[cat].push(item);
+    });
+
+    let text = "🛒 Grocery Shopping List\n\n";
+    AISLE_CATEGORIES.forEach(cat => {
+      const items = categorized[cat] || [];
+      if (items.length > 0) {
+        text += `${cat}\n`;
+        items.forEach(item => {
+          const capName = item.name.charAt(0).toUpperCase() + item.name.slice(1);
+          const amountsStr = (item.amounts || []).map(a => `${a.amount} ${a.unit}`).join(', ');
+          text += `- ${capName}: ${amountsStr}\n`;
+        });
+        text += "\n";
+      }
+    });
+
+    return text.trim();
+  }
+
+  /**
+   * 1-Click Copy grocery list to clipboard
+   */
+  function handleCopyShoppingList() {
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+    const text = formatShoppingListText(plan);
+    if (!text) {
+      showToast("No grocery items found to copy.", true);
+      return;
+    }
+
+    const copyText = document.getElementById('btn-copy-shopping-text');
+
+    function onCopySuccess() {
+      if (copyText) copyText.textContent = "✓ Copied!";
+      showToast("📋 Grocery list copied to clipboard (ready for Notes / Keep / Instacart)!");
+      setTimeout(() => {
+        if (copyText) copyText.textContent = "Copy for Notes / Instacart";
+      }, 2500);
+    }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text)
+        .then(onCopySuccess)
+        .catch(() => fallbackCopyText(text, onCopySuccess));
+    } else {
+      fallbackCopyText(text, onCopySuccess);
+    }
+  }
+
+  function fallbackCopyText(text, onSuccess) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      if (successful) {
+        if (onSuccess) onSuccess();
+      } else {
+        showToast("Could not copy list to clipboard.", true);
+      }
+    } catch (e) {
+      showToast("Could not copy list to clipboard.", true);
+    }
+  }
+
+  function scrollToShoppingList(event) {
+    if (event) event.preventDefault();
+    const section = document.getElementById('shopping-list-section');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
   /**
    * Update the Gemini API status badge & description
    */
@@ -615,7 +1096,7 @@
     </div>
   `;
 
-    // If plan is approved and fully executed, show links to generated artifacts
+    // If plan is approved and fully executed, show links to generated artifacts and in-app grocery checklist
     if (plan.approved && plan.executionResult) {
       const res = plan.executionResult;
       html += `
@@ -623,11 +1104,17 @@
         <h4 class="success-title">Meal plan complete!</h4>
         <p class="success-desc">Individual recipe instructions have been uploaded to your Google Drive, dinner prep events have been added to your Default Google Calendar, and a consolidated shopping list document has been compiled.</p>
         <div class="success-links">
-          <a href="${res.shoppingListDocUrl}" target="_blank" class="doc-link">🛒 Open Shopping List (${res.shoppingListDocName})</a>
+          <a href="#shopping-list-section" class="doc-link" onclick="scrollToShoppingList(event)">🛒 In-App Grocery Checklist</a>
+          <a href="${res.shoppingListDocUrl}" target="_blank" class="doc-link">📄 Open Drive Doc (${res.shoppingListDocName})</a>
           <a href="https://calendar.google.com" target="_blank" class="doc-link">📅 Open Google Calendar</a>
         </div>
       </div>
-      
+    `;
+
+      // Render In-App Interactive Grocery Checklist (MPA-13)
+      html += renderShoppingListHtml(plan);
+
+      html += `
       <div style="font-size: 14px; font-weight:600; margin-bottom: 16px; text-transform: uppercase; color:var(--text-muted);">Generated Recipe Documents</div>
       <div class="success-links" style="justify-content: flex-start; margin-bottom: 32px;">
     `;
