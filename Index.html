@@ -148,6 +148,11 @@
             <button class="btn" onclick="handleGenerateMealPlan()"><i class="brand-icon" style="font-size:16px;">✦</i>
               Generate Dinner Plan</button>
           </div>
+
+          <!-- Ephemeral Re-use Staged Notice on Planner Tab -->
+          <div id="planner-reuse-notice" class="planner-reuse-notice" style="display: none;">
+            <!-- Staged past recipes will be listed here -->
+          </div>
         </div>
         <div id="planner-container">
           <!-- Dynamic meal plan, cards, and execution reports are rendered here -->
@@ -157,12 +162,41 @@
       <!-- VIEW: HISTORY -->
       <div class="view" id="history-view">
         <div class="panel">
-          <h2 class="panel-title">📜 Recipe History</h2>
-          <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
-            Below are the 25 most recently created recipes from your <strong>Meal Plan Recipes</strong> folder in
-            Google
-            Drive.
-          </p>
+          <div class="history-header-row">
+            <div>
+              <h2 class="panel-title" style="margin-bottom: 4px;">📜 Past Recipes & Favorites</h2>
+              <p id="history-desc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 0;">
+                Review past recipes, rate your family favorites (0–5 stars), and check boxes to re-use recipes in your next meal plan.
+              </p>
+            </div>
+          </div>
+
+          <!-- History Sub-Navigation Tabs -->
+          <div class="history-subnav">
+            <button type="button" class="history-subtab active" id="subtab-history-recent" onclick="switchHistoryTab('recent')">
+              <span class="subtab-icon">📜</span>
+              <span>Recipe History</span>
+              <span class="subtab-badge" id="badge-recent-count">0</span>
+            </button>
+            <button type="button" class="history-subtab" id="subtab-history-favorites" onclick="switchHistoryTab('favorites')">
+              <span class="subtab-icon">⭐</span>
+              <span>Past Favorites</span>
+              <span class="subtab-badge" id="badge-favorites-count">0</span>
+            </button>
+          </div>
+
+          <!-- Staged Re-use Banner in History View -->
+          <div id="history-reuse-banner" class="reuse-banner" style="display: none;">
+            <div class="reuse-banner-content">
+              <span class="reuse-banner-icon">✨</span>
+              <span id="reuse-banner-text"><strong>0 recipes</strong> selected to re-use</span>
+            </div>
+            <div class="reuse-banner-actions">
+              <button type="button" class="btn btn-sm btn-gold" onclick="switchView('planner')">🗓️ Open in Planner</button>
+              <button type="button" class="btn btn-secondary btn-sm" onclick="clearReusedRecipes()">✕ Clear</button>
+            </div>
+          </div>
+
           <div id="history-container">
             <!-- Dynamic history items list is rendered here -->
           </div>

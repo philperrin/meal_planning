@@ -74,7 +74,7 @@ function assertDeepEqual(actual, expected, message) {
 // ---------------------------------------------------------
 // Mock Google Apps Script Environment Factory
 // ---------------------------------------------------------
-function createMockGasContext(initialDb, initialUserProps = {}, initialScriptProps = {}) {
+function createMockGasContext(initialDb, initialUserProps = {}, initialScriptProps = {}, mockRecipeFiles = []) {
   let dbState = JSON.parse(JSON.stringify(initialDb || {
     preferences: {
       allergies: "No eggs.",
@@ -84,11 +84,14 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
       defaultMealTime: "06:00 PM"
     },
     mealPlan: null,
+    recipeRatings: {},
+    recipeLibrary: {},
     lastUpdated: new Date().toISOString()
   }));
 
   const userPropsStore = { ...initialUserProps };
   const scriptPropsStore = { ...initialScriptProps };
+  let recipeFiles = [...mockRecipeFiles];
 
   const mockFile = {
     getBlob: () => ({
@@ -149,7 +152,22 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
       getFoldersByName: () => ({
         hasNext: () => true,
         next: () => ({
-          getFiles: () => ({ hasNext: () => false, next: () => null }),
+          getFiles: () => {
+            let idx = 0;
+            return {
+              hasNext: () => idx < recipeFiles.length,
+              next: () => {
+                const item = recipeFiles[idx++];
+                return {
+                  getName: () => item.name,
+                  getUrl: () => item.url || `https://docs.google.com/document/d/${item.id || 'id'}/edit`,
+                  getId: () => item.id || 'id',
+                  getDateCreated: () => new Date(item.createdTime || Date.now()),
+                  setName: (newName) => { item.name = newName; }
+                };
+              }
+            };
+          },
           getFoldersByName: () => ({ hasNext: () => true, next: () => ({ createFolder: () => ({}) }) }),
           createFolder: () => ({})
         })
@@ -158,9 +176,16 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
         getFoldersByName: () => ({ hasNext: () => false }),
         createFolder: () => ({})
       }),
-      getFileById: () => ({
-        moveTo: () => {}
-      })
+      getFileById: (id) => {
+        const found = recipeFiles.find(f => f.id === id);
+        return {
+          getName: () => (found ? found.name : "mock-file"),
+          setName: (newName) => { if (found) found.name = newName; },
+          getUrl: () => `https://docs.google.com/document/d/${id}/edit`,
+          getId: () => id,
+          moveTo: () => {}
+        };
+      }
     },
     HtmlService: {
       XFrameOptionsMode: { ALLOWALL: 'ALLOWALL' },
@@ -685,6 +710,168 @@ describe('7. Skip Welcome Preference & Matte Styling Experience', () => {
   test('JavaScript.html defines handleToggleSkipWelcome and synchronizes preference with backend and localStorage', () => {
     assert(jsHtml.includes('function handleToggleSkipWelcome'), 'handleToggleSkipWelcome function must exist in JavaScript.html');
     assert(jsHtml.includes('setSkipWelcomePreference'), 'JavaScript.html must call setSkipWelcomePreference on Google Apps Script');
+  });
+});
+
+// 8. Recipe Ratings & Recipe Re-use Workflow (MPA-8)
+describe('8. Recipe Ratings & Recipe Re-use Workflow (MPA-8)', () => {
+  const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+  const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+  const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+
+  test('Index.html defines History sub-navigation tabs, reuse banner, and planner reuse notice', () => {
+    assert(indexHtml.includes('id="subtab-history-recent"'), 'Index.html must have subtab-history-recent');
+    assert(indexHtml.includes('id="subtab-history-favorites"'), 'Index.html must have subtab-history-favorites');
+    assert(indexHtml.includes('id="history-reuse-banner"'), 'Index.html must have history-reuse-banner');
+    assert(indexHtml.includes('id="planner-reuse-notice"'), 'Index.html must have planner-reuse-notice');
+  });
+
+  test('Styles.html defines styles for sub-tabs, star ratings, and reuse banners', () => {
+    assert(stylesHtml.includes('.history-subnav'), 'Styles.html must define .history-subnav');
+    assert(stylesHtml.includes('.star-rating'), 'Styles.html must define .star-rating');
+    assert(stylesHtml.includes('.star-btn'), 'Styles.html must define .star-btn');
+    assert(stylesHtml.includes('.reuse-banner'), 'Styles.html must define .reuse-banner');
+    assert(stylesHtml.includes('.planner-reuse-notice'), 'Styles.html must define .planner-reuse-notice');
+  });
+
+  test('JavaScript.html defines switchHistoryTab, toggleReuseRecipe, clearReusedRecipes, renderStarRating, and handleSetRating', () => {
+    assert(jsHtml.includes('function switchHistoryTab'), 'switchHistoryTab missing in JavaScript.html');
+    assert(jsHtml.includes('function toggleReuseRecipe'), 'toggleReuseRecipe missing in JavaScript.html');
+    assert(jsHtml.includes('function clearReusedRecipes'), 'clearReusedRecipes missing in JavaScript.html');
+    assert(jsHtml.includes('function renderStarRating'), 'renderStarRating missing in JavaScript.html');
+    assert(jsHtml.includes('function handleSetRating'), 'handleSetRating missing in JavaScript.html');
+  });
+
+  test('Backend setRecipeRating() sets and persists 0-5 star ratings in DB', () => {
+    const context = createMockGasContext();
+    const res = context.setRecipeRating('Lemon Salmon', 5);
+    assertEqual(res.success, true, 'setRecipeRating must return success: true');
+    assertEqual(res.rating, 5, 'setRecipeRating must return rating: 5');
+
+    const db = context.getMockDbState();
+    assertEqual(db.recipeRatings['Lemon Salmon'].rating, 5, 'Rating must be persisted in db.recipeRatings');
+
+    // Test clamping between 0 and 5
+    const clampedHigh = context.setRecipeRating('Tacos', 10);
+    assertEqual(clampedHigh.rating, 5, 'Rating > 5 should clamp to 5');
+    const clampedLow = context.setRecipeRating('Tacos', -2);
+    assertEqual(clampedLow.rating, 0, 'Rating < 0 should clamp to 0');
+  });
+
+  test('Backend getRecipeHistory() sorts History by scheduled date descending and Favorites by rating + date', () => {
+    const mockFiles = [
+      { name: "20260901 - Old Salmon", id: "salmon-doc", createdTime: 1000 },
+      { name: "20260908 - Fresh Tacos", id: "tacos-doc", createdTime: 2000 },
+      { name: "20260905 - Mid Chicken", id: "chicken-doc", createdTime: 1500 }
+    ];
+
+    const initialDb = {
+      preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
+      mealPlan: null,
+      recipeRatings: {
+        "Old Salmon": { rating: 5 },
+        "Mid Chicken": { rating: 4 },
+        "Fresh Tacos": { rating: 0 }
+      },
+      recipeLibrary: {},
+      lastUpdated: new Date().toISOString()
+    };
+
+    const context = createMockGasContext(initialDb, {}, {}, mockFiles);
+    const result = context.getRecipeHistory();
+
+    // Verify history sorted by scheduled date descending (2026-09-08, 2026-09-05, 2026-09-01)
+    assertEqual(result.history.length, 3, 'History should contain all 3 recipes');
+    assertEqual(result.history[0].name, 'Fresh Tacos', 'Most recent scheduled date (2026-09-08) should be first');
+    assertEqual(result.history[1].name, 'Mid Chicken', 'Second scheduled date (2026-09-05) should be second');
+    assertEqual(result.history[2].name, 'Old Salmon', 'Third scheduled date (2026-09-01) should be third');
+
+    // Verify favorites filtered for rating > 0 and sorted by rating descending (5 stars -> 4 stars)
+    assertEqual(result.favorites.length, 2, 'Favorites should only contain 2 recipes with rating > 0');
+    assertEqual(result.favorites[0].name, 'Old Salmon', '5-star recipe should be top favorite');
+    assertEqual(result.favorites[0].rating, 5, 'Old Salmon rating should be 5');
+    assertEqual(result.favorites[1].name, 'Mid Chicken', '4-star recipe should be second favorite');
+    assertEqual(result.favorites[1].rating, 4, 'Mid Chicken rating should be 4');
+  });
+
+  test('Backend generateMealPlanServer() supports complete and partial recipe reuse', () => {
+    const initialDb = {
+      preferences: { dinersCount: 4, defaultMealTime: "06:00 PM" },
+      mealPlan: null,
+      recipeRatings: {},
+      recipeLibrary: {
+        "Favorite Pasta": {
+          name: "Favorite Pasta",
+          description: "Garlic penne",
+          prepTime: "10 mins",
+          cookTime: "15 mins",
+          ingredients: [{ name: "pasta", amount: 1, unit: "box" }],
+          instructions: ["Boil and drain."],
+          originalDiners: 2,
+          docId: "pasta-id"
+        }
+      },
+      lastUpdated: new Date().toISOString()
+    };
+
+    const userProps = { GEMINI_API_KEY: "mock-key" };
+    const context = createMockGasContext(initialDb, userProps);
+
+    // Test 1: Full reuse (reused count >= meal count) - Gemini bypass
+    const resFull = context.generateMealPlanServer(1, "", ["Favorite Pasta"]);
+    assertEqual(resFull.success, true, 'Full reuse should succeed');
+    const plan1 = resFull.db.mealPlan;
+    assertEqual(plan1.recipes.length, 1, 'Plan should contain 1 recipe');
+    assertEqual(plan1.recipes[0].name, "Favorite Pasta", 'Recipe name should match reused recipe');
+    // Ingredient scaled from 2 diners to 4 diners (1 * 4 / 2 = 2)
+    assertEqual(plan1.recipes[0].ingredients[0].amount, 2, 'Ingredients should scale from 2 to 4 diners');
+
+    // Test 2: Partial reuse (1 reused + 1 Gemini generated)
+    const resPartial = context.generateMealPlanServer(2, "", ["Favorite Pasta"]);
+    assertEqual(resPartial.success, true, 'Partial reuse should succeed');
+    const plan2 = resPartial.db.mealPlan;
+    assertEqual(plan2.recipes.length, 2, 'Plan should contain 2 recipes (1 reused + 1 generated)');
+    assertEqual(plan2.recipes[0].name, "Favorite Pasta", 'First recipe should be reused');
+    assertEqual(plan2.recipes[1].name, "Mock Recipe", 'Second recipe should be generated from Gemini');
+  });
+
+  test('Backend approveMealPlanServer() re-titles existing Google Doc and updates recipeLibrary', () => {
+    const mockFiles = [
+      { name: "20260901 - Classic Salmon", id: "salmon-doc-123", createdTime: 1000 }
+    ];
+
+    const initialDb = {
+      preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
+      mealPlan: {
+        recipes: [
+          {
+            name: "Classic Salmon",
+            description: "Delicious salmon dish",
+            prepTime: "10 mins",
+            cookTime: "20 mins",
+            ingredients: [{ name: "Salmon", amount: 2, unit: "fillets" }],
+            instructions: ["Roast salmon."],
+            docId: "salmon-doc-123"
+          }
+        ],
+        approved: false,
+        generatedAt: new Date().toISOString()
+      },
+      recipeRatings: {},
+      recipeLibrary: {},
+      lastUpdated: new Date().toISOString()
+    };
+
+    const context = createMockGasContext(initialDb, {}, {}, mockFiles);
+    const approvedList = [{ name: "Classic Salmon", date: "2026-09-14" }];
+
+    const res = context.approveMealPlanServer(approvedList);
+    assertEqual(res.success, true, 'approveMealPlanServer should succeed');
+    assertEqual(mockFiles[0].name, "20260914 - Classic Salmon", 'Existing file must be renamed with the new date prefix');
+
+    const db = context.getMockDbState();
+    assertEqual(db.recipeLibrary["Classic Salmon"].lastScheduledDate, "2026-09-14", 'lastScheduledDate must be saved in recipeLibrary');
+    assertEqual(db.mealPlan.approved, true, 'Plan approved status must be true');
   });
 });
 
