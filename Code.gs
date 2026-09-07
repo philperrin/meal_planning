@@ -82,16 +82,71 @@ function loadAppData() {
       file.setContent(JSON.stringify(db, null, 2));
     }
     
-    var userProperties = PropertiesService.getUserProperties();
-    var apiKey = userProperties.getProperty('GEMINI_API_KEY');
+    var effectiveKey = getEffectiveApiKey();
+    var scriptProperties = PropertiesService.getScriptProperties();
+    var personalKey = userProperties.getProperty('GEMINI_API_KEY');
+    var sharedKey = scriptProperties.getProperty('SHARED_GEMINI_API_KEY') || scriptProperties.getProperty('GEMINI_API_KEY');
     
     return {
       db: db,
-      hasApiKey: !!apiKey
+      hasApiKey: effectiveKey.keyType !== 'none',
+      apiKeyStatus: {
+        hasPersonalKey: !!(personalKey && personalKey.trim().length > 0),
+        hasSharedKey: !!(sharedKey && sharedKey.trim().length > 0),
+        activeKeyType: effectiveKey.keyType
+      }
     };
   } catch (e) {
     Logger.log("Error loading app data: " + e.toString());
     throw new Error("Failed to load app data: " + e.message);
+  }
+}
+
+/**
+ * Resolves the effective Gemini API key using the Hybrid model.
+ * Checks User Properties first (personal key). If absent, falls back to Script Properties (shared starter key).
+ */
+function getEffectiveApiKey() {
+  var userProperties = PropertiesService.getUserProperties();
+  var personalKey = userProperties.getProperty('GEMINI_API_KEY');
+  if (personalKey && personalKey.trim().length > 0) {
+    return {
+      key: personalKey.trim(),
+      keyType: 'personal'
+    };
+  }
+
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var sharedKey = scriptProperties.getProperty('SHARED_GEMINI_API_KEY') || scriptProperties.getProperty('GEMINI_API_KEY');
+  if (sharedKey && sharedKey.trim().length > 0) {
+    return {
+      key: sharedKey.trim(),
+      keyType: 'shared'
+    };
+  }
+
+  return {
+    key: null,
+    keyType: 'none'
+  };
+}
+
+/**
+ * Admin helper to set the shared starter API key in Script Properties.
+ * Can be run from the Apps Script editor or called by project owner.
+ */
+function setSharedApiKey(apiKey) {
+  try {
+    var scriptProperties = PropertiesService.getScriptProperties();
+    if (apiKey && apiKey.trim().length > 0) {
+      scriptProperties.setProperty('SHARED_GEMINI_API_KEY', apiKey.trim());
+    } else {
+      scriptProperties.deleteProperty('SHARED_GEMINI_API_KEY');
+    }
+    return { success: true };
+  } catch (e) {
+    Logger.log("Error setting shared API Key: " + e.toString());
+    throw new Error("Failed to set shared API Key: " + e.message);
   }
 }
 
@@ -128,7 +183,15 @@ function saveApiKey(apiKey) {
   try {
     var userProperties = PropertiesService.getUserProperties();
     userProperties.setProperty('GEMINI_API_KEY', apiKey.trim());
-    return { success: true };
+    var effectiveKey = getEffectiveApiKey();
+    return { 
+      success: true,
+      apiKeyStatus: {
+        hasPersonalKey: true,
+        hasSharedKey: effectiveKey.keyType === 'shared' || !!(PropertiesService.getScriptProperties().getProperty('SHARED_GEMINI_API_KEY') || PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY')),
+        activeKeyType: 'personal'
+      }
+    };
   } catch (e) {
     Logger.log("Error saving API Key: " + e.toString());
     throw new Error("Failed to save API Key: " + e.message);
@@ -142,7 +205,15 @@ function deleteApiKey() {
   try {
     var userProperties = PropertiesService.getUserProperties();
     userProperties.deleteProperty('GEMINI_API_KEY');
-    return { success: true };
+    var effectiveKey = getEffectiveApiKey();
+    return { 
+      success: true,
+      apiKeyStatus: {
+        hasPersonalKey: false,
+        hasSharedKey: effectiveKey.keyType === 'shared',
+        activeKeyType: effectiveKey.keyType
+      }
+    };
   } catch (e) {
     Logger.log("Error deleting API Key: " + e.toString());
     throw new Error("Failed to delete API Key: " + e.message);
@@ -157,11 +228,11 @@ function generateMealPlanServer(mealCount, planPreferences) {
     mealCount = parseInt(mealCount, 10) || 7;
     planPreferences = planPreferences ? String(planPreferences).trim() : "";
     
-    var userProperties = PropertiesService.getUserProperties();
-    var apiKey = userProperties.getProperty('GEMINI_API_KEY');
-    if (!apiKey) {
+    var effectiveKey = getEffectiveApiKey();
+    if (effectiveKey.keyType === 'none' || !effectiveKey.key) {
       throw new Error("Gemini API key is not configured. Please set it in the Settings panel.");
     }
+    var apiKey = effectiveKey.key;
     
     var file = getDatabaseFile();
     var db = JSON.parse(file.getBlob().getDataAsString());
@@ -261,6 +332,13 @@ function generateMealPlanServer(mealCount, planPreferences) {
     var responseText = response.getContentText();
     
     if (responseCode !== 200) {
+      if (responseCode === 429) {
+        if (effectiveKey.keyType === 'shared') {
+          throw new Error("The shared starter API quota is temporarily full. Please wait a moment, or add your own free personal API key in Settings (under '✨ Create API Key') for instant dedicated access.");
+        } else {
+          throw new Error("Your personal Gemini API rate limit / quota has been reached. Please check your Google AI Studio quota limits.");
+        }
+      }
       throw new Error("Gemini API error (Status " + responseCode + "): " + responseText);
     }
     

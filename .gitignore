@@ -1,10 +1,29 @@
 # Google Clasp and Node dependencies
 node_modules/
 creds.json
+credentials.json
+client_secret*.json
 .clasp.json
+.clasprc.json
 package-lock.json
+
+# Environment variables & secrets
+.env
+.env.*
+*.env
 
 # Local configurations and logs
 *.log
 .DS_Store
 Thumbs.db
+desktop.ini
+*.tmp
+*.bak
+
+# IDE & Editor settings
+.vscode/
+.idea/
+
+# Internal planning & export files
+jira_backlog_meal_planner_improvements.csv
+generate_csv.js

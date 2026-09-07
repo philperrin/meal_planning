@@ -145,18 +145,30 @@
               <label style="margin-bottom:0;">Gemini API Key</label>
               <div id="api-badge" class="api-badge missing">• Checking status...</div>
             </div>
-            <div class="input-desc">Required to authenticate and run the Gemini AI generation models. Saved in Apps
-              Script User Properties (private to you).<br> Create an API key here:
-              <a href="https://aistudio.google.com/app/apikey"
-                target="_blank">https://aistudio.google.com/app/apikey</a>
+            <div class="input-desc" id="api-desc">
+              Required to run the Gemini AI recipe generation models. The app includes a shared starter key, or you can supply your own personal key from Google AI Studio for dedicated rate limits.
             </div>
-            <input type="text" id="api-key-input" placeholder="Paste your AIzaSy... key here">
+            <input type="text" id="api-key-input" placeholder="Paste personal AIzaSy... key to override">
           </div>
 
-          <div style="display: flex; gap: 12px; margin-top: 24px;">
+          <div style="display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="window.open('https://aistudio.google.com/app/apikey', '_blank')">✨ Create API Key</button>
             <button class="btn" onclick="handleSaveApiKey()">🔑 Save API Key</button>
-            <button class="btn btn-secondary btn-danger" onclick="handleDeleteApiKey()">❌ Clear API Key</button>
+            <button class="btn btn-secondary btn-danger" onclick="handleDeleteApiKey()">❌ Clear Personal Key</button>
           </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title" style="font-size: 16px; margin-bottom: 12px;">🔒 Data Privacy & How Your Information Is Handled</h3>
+          <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
+            We respect your privacy and designed this application to keep your personal data strictly under your control:
+          </p>
+          <ul style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px; display: flex; flex-direction: column; gap: 8px;">
+            <li><strong>Local Storage in Your Google Drive:</strong> All your personal data—including dietary preferences, allergies, custom recipes, meal history, and approved meal plans—is stored exclusively in your private Google Drive in the <strong style="color:var(--accent-secondary);">Automated_Meal_Planner_DB.json</strong> file. No external database or unauthorized party can access your information.</li>
+            <li><strong>AI Generation & Processing:</strong> When generating meal plans or recipes, only the necessary planning criteria (dietary restrictions, diner count, preferred/avoided cuisines, and requested meal count) are sent securely to Google's Gemini API (<code>generativelanguage.googleapis.com</code>). No identity credentials, emails, or unrelated files are transmitted.</li>
+            <li><strong>Starter vs. Personal API Key:</strong> The default starter key runs on Google AI Studio's free tier. If you provide your own personal Gemini API key, all AI requests are processed directly against your personal Google AI Studio account with your dedicated quota and privacy terms.</li>
+            <li><strong>No Third-Party Tracking:</strong> This application contains zero third-party advertising scripts, tracking pixels, or marketing analytics.</li>
+          </ul>
         </div>
 
         <div class="panel">

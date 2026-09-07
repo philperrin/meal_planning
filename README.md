@@ -61,11 +61,9 @@ This application helps you plan weekly meals by:
      ```
    - Or manually copy files to your Apps Script project editor
 
-2. **Configure API Key**
-   - Obtain a free Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-   - Open the deployed application
-   - Go to **Settings** panel and paste your API key
-   - The key is securely stored in Google Apps Script User Properties
+2. **Configure API Keys (Hybrid Model)**
+   - **Shared Starter Key (App Owner)**: In the Apps Script project editor, go to **Project Settings** (gear icon) → **Script Properties** and add `SHARED_GEMINI_API_KEY` (or run `setSharedApiKey('YOUR_KEY')`). This enables instant zero-setup meal plan generation for all users.
+   - **Personal Key Override (End Users)**: Users can click **✨ Create API Key** on the **Settings** panel to obtain a free personal key from [Google AI Studio](https://aistudio.google.com/app/apikey) for dedicated rate limits. Personal keys are stored securely in Apps Script `User Properties`.
 
 3. **Deploy as Web App**
    - In Apps Script editor: **Deploy** → **New Deployment** → **Type: Web app**

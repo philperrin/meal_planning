@@ -11,6 +11,11 @@
       mealPlan: null
     },
     hasApiKey: false,
+    apiKeyStatus: {
+      hasPersonalKey: false,
+      hasSharedKey: false,
+      activeKeyType: 'none'
+    },
     selectedRecipes: new Set(),
     cuisinePreferences: {}
   };
@@ -111,6 +116,11 @@
     hideLoader();
     appState.db = data.db;
     appState.hasApiKey = data.hasApiKey;
+    appState.apiKeyStatus = data.apiKeyStatus || {
+      hasPersonalKey: data.hasApiKey,
+      hasSharedKey: false,
+      activeKeyType: data.hasApiKey ? 'personal' : 'none'
+    };
 
     // Populate Preferences Form
     const prefs = appState.db.preferences || {};
@@ -207,19 +217,41 @@
   }
 
   /**
-   * Update the Gemini API status badge
+   * Update the Gemini API status badge & description
    */
   function updateApiBadge() {
-    if (appState.hasApiKey) {
+    const status = appState.apiKeyStatus || {
+      hasPersonalKey: appState.hasApiKey,
+      hasSharedKey: false,
+      activeKeyType: appState.hasApiKey ? 'personal' : 'none'
+    };
+
+    const descEl = document.getElementById('api-desc');
+
+    if (status.activeKeyType === 'personal') {
       els.apiBadge.className = "api-badge active";
-      els.apiBadge.innerHTML = "• API Key Saved";
-      els.apiKeyInput.placeholder = "••••••••••••••••••••••••••••••••";
+      els.apiBadge.innerHTML = "• Personal Key Active";
+      els.apiKeyInput.placeholder = "•••••••••••••••••••••••••••••••• (Personal Key Saved)";
       els.apiKeyInput.value = "";
+      if (descEl) {
+        descEl.innerHTML = "Using your <strong>personal Gemini API key</strong> (dedicated quota & limits). You can replace it anytime or click <em>Clear Personal Key</em> to revert to the shared starter key.";
+      }
+    } else if (status.activeKeyType === 'shared') {
+      els.apiBadge.className = "api-badge shared";
+      els.apiBadge.innerHTML = "• Starter Key Active (Shared)";
+      els.apiKeyInput.placeholder = "Paste personal AIzaSy... key to override";
+      els.apiKeyInput.value = "";
+      if (descEl) {
+        descEl.innerHTML = "The app is currently using the <strong>shared starter API key</strong>. You can generate meals right away, or click <em>✨ Create API Key</em> to get your own personal key for dedicated rate limits.";
+      }
     } else {
       els.apiBadge.className = "api-badge missing";
       els.apiBadge.innerHTML = "• API Key Missing";
       els.apiKeyInput.placeholder = "Enter your Gemini API key...";
       els.apiKeyInput.value = "";
+      if (descEl) {
+        descEl.innerHTML = "A Gemini API key is required to run the meal planning models. Click <em>✨ Create API Key</em> to obtain a free key from Google AI Studio, then paste and save it below.";
+      }
     }
   }
 
@@ -260,14 +292,19 @@
       return;
     }
 
-    showLoader("Saving API key...", "Storing credentials securely in Google Apps Script");
+    showLoader("Saving API key...", "Storing personal credentials securely in Google Apps Script");
 
     google.script.run
       .withSuccessHandler(res => {
         hideLoader();
         appState.hasApiKey = true;
+        if (res && res.apiKeyStatus) {
+          appState.apiKeyStatus = res.apiKeyStatus;
+        } else {
+          appState.apiKeyStatus = { hasPersonalKey: true, hasSharedKey: false, activeKeyType: 'personal' };
+        }
         updateApiBadge();
-        showToast("Gemini API key saved securely!");
+        showToast("Personal Gemini API key saved securely!");
       })
       .withFailureHandler(err => {
         hideLoader();
@@ -280,14 +317,24 @@
    * Delete API Key from PropertiesService
    */
   function handleDeleteApiKey() {
-    showLoader("Clearing API key...", "Removing credentials from Google Apps Script");
+    showLoader("Clearing personal API key...", "Removing personal credentials from Google Apps Script");
 
     google.script.run
       .withSuccessHandler(res => {
         hideLoader();
-        appState.hasApiKey = false;
+        if (res && res.apiKeyStatus) {
+          appState.apiKeyStatus = res.apiKeyStatus;
+          appState.hasApiKey = res.apiKeyStatus.activeKeyType !== 'none';
+        } else {
+          appState.hasApiKey = false;
+          appState.apiKeyStatus = { hasPersonalKey: false, hasSharedKey: false, activeKeyType: 'none' };
+        }
         updateApiBadge();
-        showToast("Gemini API key cleared.");
+        if (appState.apiKeyStatus.activeKeyType === 'shared') {
+          showToast("Personal key cleared. Reverted to shared starter key.");
+        } else {
+          showToast("Personal Gemini API key cleared.");
+        }
       })
       .withFailureHandler(err => {
         hideLoader();
@@ -301,14 +348,19 @@
    */
   function handleGenerateMealPlan() {
     if (!appState.hasApiKey) {
-      showToast("Please save your Gemini API Key in Settings first.", true);
+      showToast("Please configure an API Key in Settings first.", true);
       switchView('settings');
       return;
     }
 
     const count = parseInt(els.mealCountInput.value, 10) || 7;
     const planPreferences = els.planPreferencesInput ? els.planPreferencesInput.value.trim() : "";
-    showLoader("Calling Gemini AI...", "Generating " + count + " dinner recipes. Scaling ingredients for " + (els.prefDiners.value || 2) + " diners. This takes about 10-15 seconds.");
+    const usingShared = appState.apiKeyStatus && appState.apiKeyStatus.activeKeyType === 'shared';
+    const subtext = usingShared
+      ? "Generating " + count + " dinner recipes using shared starter key. Scaling for " + (els.prefDiners.value || 2) + " diners (10-15s)."
+      : "Generating " + count + " dinner recipes. Scaling ingredients for " + (els.prefDiners.value || 2) + " diners (10-15s).";
+
+    showLoader("Calling Gemini AI...", subtext);
 
     google.script.run
       .withSuccessHandler(res => {
