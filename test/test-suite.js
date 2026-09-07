@@ -613,6 +613,39 @@ describe('5. Mobile Responsiveness & Ergonomics Tooling (MPA-17)', () => {
   });
 });
 
+describe('6. Favicon & Welcome Page Navigation (MPA-6 & MPA-7)', () => {
+  const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+
+  test('MPA-6: Index.html includes dinner plate emoji favicon link tag', () => {
+    assert(/<link[^>]*rel=["']icon["'][^>]*href=["']data:image\/svg\+xml,[^"']*🍽️[^"']*["']/i.test(indexHtml),
+      'Favicon link tag with dinner plate emoji 🍽️ must be defined in Index.html head');
+  });
+
+  test('MPA-7: Brand header title links to welcome page', () => {
+    assert(/class=["'][^"']*brand[^"']*["'][^>]*onclick=["']switchView\('welcome'\)["']/i.test(indexHtml),
+      'Header brand element must have onclick="switchView(\'welcome\')" handler');
+  });
+
+  test('MPA-7: Welcome view is defined as active landing view with 4 guide cards', () => {
+    assert(/id=["']welcome-view["'][^>]*class=["'][^"']*view\s+active[^"']*["']/i.test(indexHtml) ||
+           /class=["'][^"']*view\s+active[^"']*["'][^>]*id=["']welcome-view["']/i.test(indexHtml),
+      'welcome-view must be the default active view in Index.html');
+
+    assert(indexHtml.includes('id="welcome-view"'), 'welcome-view must exist in Index.html');
+    assert(indexHtml.includes('Getting Started'), 'Getting Started step card must exist');
+    assert(indexHtml.includes('Setting Preferences'), 'Setting Preferences step card must exist');
+    assert(indexHtml.includes('Generating Meal Plans'), 'Generating Meal Plans step card must exist');
+    assert(indexHtml.includes('Reviewing Past Meals'), 'Reviewing Past Meals step card must exist');
+  });
+
+  test('MPA-7: Welcome cards navigate to respective views', () => {
+    assert(indexHtml.includes("switchView('settings')"), 'Welcome view must link to settings view');
+    assert(indexHtml.includes("switchView('preferences')"), 'Welcome view must link to preferences view');
+    assert(indexHtml.includes("switchView('planner')"), 'Welcome view must link to planner view');
+    assert(indexHtml.includes("switchView('history')"), 'Welcome view must link to history view');
+  });
+});
+
 // ---------------------------------------------------------
 // Summary Readout & Exit Code Handling
 // ---------------------------------------------------------

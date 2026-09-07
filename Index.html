@@ -4,6 +4,8 @@
 <head>
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Meal Planning Assistant</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
   <!-- Include Premium CSS Stylesheet -->
   <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
 </head>
@@ -13,12 +15,12 @@
   <div class="app-container">
     <!-- Header Area -->
     <header>
-      <div class="brand">
+      <div class="brand" onclick="switchView('welcome')" role="button" tabindex="0" title="Return to Welcome" aria-label="Meal Planning Assistant Home">
         <span class="brand-icon">🍽️</span>
         <h1>Meal Planning Assistant</h1>
       </div>
       <nav class="nav-desktop">
-        <button class="nav-tab active" data-view="planner">🗓️ Planner</button>
+        <button class="nav-tab" data-view="planner">🗓️ Planner</button>
         <button class="nav-tab" data-view="history">📜 History</button>
         <button class="nav-tab" data-view="preferences">❤️ Preferences</button>
         <button class="nav-tab" data-view="settings">⚙️ Settings</button>
@@ -35,8 +37,97 @@
         <div class="loading-subtext" id="loading-subtext">Please wait while we set up the application.</div>
       </div>
 
+      <!-- VIEW: WELCOME (Landing View) -->
+      <div class="view active" id="welcome-view">
+        <div class="panel welcome-hero">
+          <div class="welcome-hero-content">
+            <div class="welcome-badge">🍽️ Automated Kitchen & Meal Companion</div>
+            <h2 class="welcome-title">Welcome to Meal Planning Assistant</h2>
+            <p class="welcome-lead">
+              Your intelligent meal planning assistant designed to streamline your weekly dinner planning. Effortlessly generate balanced meal plans, automatically save organized recipe documents directly to your Google Drive, create grocery shopping lists, and schedule cooking sessions onto your Google Calendar.
+            </p>
+          </div>
+        </div>
+
+        <div class="welcome-grid">
+          <!-- Step 1: Getting Started -->
+          <div class="welcome-card" onclick="switchView('settings')" role="button" tabindex="0">
+            <div class="welcome-card-header">
+              <span class="welcome-step-num">Step 1</span>
+              <span class="welcome-card-icon">⚙️</span>
+            </div>
+            <h3 class="welcome-card-title">Getting Started</h3>
+            <p class="welcome-card-desc">
+              Go to the <strong>Settings</strong> page to confirm you have an active Gemini API key connected to power your AI meal generation.
+            </p>
+            <button class="welcome-card-btn" type="button" onclick="event.stopPropagation(); switchView('settings');">
+              Configure Settings <span>→</span>
+            </button>
+          </div>
+
+          <!-- Step 2: Setting Preferences -->
+          <div class="welcome-card" onclick="switchView('preferences')" role="button" tabindex="0">
+            <div class="welcome-card-header">
+              <span class="welcome-step-num">Step 2</span>
+              <span class="welcome-card-icon">❤️</span>
+            </div>
+            <h3 class="welcome-card-title">Setting Preferences</h3>
+            <p class="welcome-card-desc">
+              Visit the <strong>Preferences</strong> tab to input basic and ongoing meal planning preferences such as allergies, dietary goals, diners, prep time, and preferred cuisines.
+            </p>
+            <button class="welcome-card-btn" type="button" onclick="event.stopPropagation(); switchView('preferences');">
+              Set Preferences <span>→</span>
+            </button>
+          </div>
+
+          <!-- Step 3: Generating Meal Plans -->
+          <div class="welcome-card" onclick="switchView('planner')" role="button" tabindex="0">
+            <div class="welcome-card-header">
+              <span class="welcome-step-num">Step 3</span>
+              <span class="welcome-card-icon">🗓️</span>
+            </div>
+            <h3 class="welcome-card-title">Generating Meal Plans</h3>
+            <p class="welcome-card-desc">
+              Use the <strong>Planner</strong> tab to generate customized dinners that automatically store recipes in your Google Drive and save meal events to your Google Calendar.
+            </p>
+            <button class="welcome-card-btn" type="button" onclick="event.stopPropagation(); switchView('planner');">
+              Open Planner <span>→</span>
+            </button>
+          </div>
+
+          <!-- Step 4: Reviewing Past Meals -->
+          <div class="welcome-card" onclick="switchView('history')" role="button" tabindex="0">
+            <div class="welcome-card-header">
+              <span class="welcome-step-num">Step 4</span>
+              <span class="welcome-card-icon">📜</span>
+            </div>
+            <div class="welcome-card-title-row">
+              <h3 class="welcome-card-title">Reviewing Past Meals</h3>
+              <span class="welcome-upcoming-badge">Upcoming</span>
+            </div>
+            <p class="welcome-card-desc">
+              Use the <strong>History</strong> tab to review previous recipes stored in Google Drive, with upcoming features to rate and incorporate past favorites into new plans.
+            </p>
+            <button class="welcome-card-btn" type="button" onclick="event.stopPropagation(); switchView('history');">
+              Explore History <span>→</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="welcome-cta-panel panel">
+          <div class="welcome-cta-text">
+            <h4>Ready to start planning?</h4>
+            <p>Jump directly into generating this week's dinner plan or fine-tune your dietary preferences.</p>
+          </div>
+          <div class="welcome-cta-actions">
+            <button class="btn btn-secondary" onclick="switchView('preferences')">❤️ Set Preferences</button>
+            <button class="btn" onclick="switchView('planner')">🗓️ Generate Meal Plan</button>
+          </div>
+        </div>
+      </div>
+
       <!-- VIEW: PLANNER -->
-      <div class="view active" id="planner-view">
+      <div class="view" id="planner-view">
         <div class="panel" style="margin-bottom: 24px; padding: 24px;">
           <div class="form-group" style="margin-bottom: 20px;">
             <label for="plan-preferences-input">Preferences for this meal plan</label>
@@ -197,7 +288,7 @@
 
     <!-- STICKY BOTTOM NAVIGATION (MOBILE) -->
     <nav class="bottom-nav" id="bottom-nav" aria-label="Mobile Navigation">
-      <button class="nav-tab active" data-view="planner">
+      <button class="nav-tab" data-view="planner">
         <span class="nav-tab-icon">🗓️</span>
         <span class="nav-tab-label">Planner</span>
       </button>

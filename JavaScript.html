@@ -79,6 +79,28 @@
         switchView(targetView);
       });
     });
+
+    // Make brand header title clickable to return to welcome page
+    const brandEl = document.querySelector('.brand');
+    if (brandEl) {
+      brandEl.addEventListener('click', () => switchView('welcome'));
+      brandEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          switchView('welcome');
+        }
+      });
+    }
+
+    // Make welcome cards keyboard accessible
+    document.querySelectorAll('.welcome-card').forEach(card => {
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          card.click();
+        }
+      });
+    });
   }
 
   function switchView(viewId) {
@@ -94,11 +116,12 @@
     });
 
     // Update Main Content Views
-    els.views.forEach(v => v.classList.remove('active'));
+    const allViews = document.querySelectorAll('.view');
+    allViews.forEach(v => v.classList.remove('active'));
     const targetView = document.getElementById(`${viewId}-view`);
     if (targetView) targetView.classList.add('active');
 
-    // Scroll to top smoothly when switching views on mobile
+    // Scroll to top smoothly when switching views
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Fetch history if the tab is selected

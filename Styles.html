@@ -100,6 +100,29 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 10px;
+    margin: -6px -10px;
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+  }
+
+  .brand:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .brand:hover h1 {
+    color: var(--accent-secondary);
+  }
+
+  .brand:active {
+    transform: scale(0.98);
+  }
+
+  .brand:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
   }
 
   .brand-icon {
@@ -113,6 +136,7 @@
     font-weight: 700;
     letter-spacing: -0.5px;
     color: var(--text-primary);
+    transition: color 0.2s ease;
   }
 
   nav {
@@ -176,6 +200,228 @@
     box-shadow: var(--shadow-md);
     margin-bottom: 24px;
     transition: var(--transition);
+  }
+
+  /* ==========================================================================
+     Welcome / Landing View Styles
+     ========================================================================== */
+  .welcome-hero {
+    background: linear-gradient(135deg, rgba(39, 42, 30, 0.85) 0%, rgba(28, 30, 21, 0.95) 100%);
+    border: 1px solid rgba(101, 109, 74, 0.25);
+    position: relative;
+    overflow: hidden;
+    padding: 36px 32px;
+  }
+
+  .welcome-hero::before {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(166, 138, 100, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .welcome-hero-content {
+    position: relative;
+    z-index: 1;
+    max-width: 860px;
+  }
+
+  .welcome-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(101, 109, 74, 0.2);
+    border: 1px solid rgba(101, 109, 74, 0.35);
+    color: var(--accent-primary);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    margin-bottom: 14px;
+  }
+
+  .welcome-title {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    line-height: 1.25;
+  }
+
+  .welcome-lead {
+    font-size: 15px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+  }
+
+  .welcome-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .welcome-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    transition: var(--transition);
+    user-select: none;
+    position: relative;
+  }
+
+  .welcome-card:hover {
+    border-color: var(--border-card-hover);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    background: rgba(45, 49, 34, 0.85);
+  }
+
+  .welcome-card:active {
+    transform: translateY(-1px);
+  }
+
+  .welcome-card:focus-visible {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: 2px;
+  }
+
+  .welcome-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .welcome-step-num {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent-secondary);
+    background: rgba(166, 138, 100, 0.12);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(166, 138, 100, 0.25);
+  }
+
+  .welcome-card-icon {
+    font-size: 24px;
+    line-height: 1;
+  }
+
+  .welcome-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .welcome-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .welcome-card-title-row .welcome-card-title {
+    margin-bottom: 0;
+  }
+
+  .welcome-upcoming-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--accent-secondary);
+    background: rgba(166, 138, 100, 0.15);
+    border: 1px solid rgba(166, 138, 100, 0.3);
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+
+  .welcome-card-desc {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    flex-grow: 1;
+    margin-bottom: 18px;
+  }
+
+  .welcome-card-desc strong {
+    color: var(--text-primary);
+  }
+
+  .welcome-card-btn {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+
+  .welcome-card-btn span {
+    transition: transform 0.2s ease;
+  }
+
+  .welcome-card:hover .welcome-card-btn {
+    background: rgba(101, 109, 74, 0.2);
+    border-color: rgba(101, 109, 74, 0.35);
+    color: var(--text-primary);
+  }
+
+  .welcome-card:hover .welcome-card-btn span {
+    transform: translateX(3px);
+  }
+
+  .welcome-cta-panel {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 32px;
+    background: rgba(39, 42, 30, 0.5);
+    border: 1px solid var(--border-card);
+  }
+
+  .welcome-cta-text h4 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+
+  .welcome-cta-text p {
+    font-size: 13.5px;
+    color: var(--text-secondary);
+  }
+
+  .welcome-cta-actions {
+    display: flex;
+    gap: 12px;
+    flex-shrink: 0;
   }
 
   .panel-title {
@@ -960,6 +1206,49 @@
     .panel-title {
       font-size: 18px;
       margin-bottom: 16px;
+    }
+
+    /* Mobile Welcome Page Layout */
+    .welcome-hero {
+      padding: 20px 16px;
+    }
+
+    .welcome-title {
+      font-size: 20px;
+    }
+
+    .welcome-lead {
+      font-size: 13.5px;
+    }
+
+    .welcome-grid {
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .welcome-card {
+      padding: 18px 16px;
+    }
+
+    .welcome-card:hover {
+      transform: none; /* Disable 3D shift on touch screens */
+    }
+
+    .welcome-card-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .welcome-cta-panel {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 20px 16px;
+      gap: 16px;
+    }
+
+    .welcome-cta-actions {
+      flex-direction: column;
     }
 
     /* Mobile Compact Recipe Card */
