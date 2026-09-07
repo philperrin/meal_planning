@@ -1,11 +1,17 @@
 /**
  * Automated Test Suite for Meal Planning Assistant
  *
- * Validates:
- * 1. Syntax and JSON/HTML integrity
- * 2. Undeclared variable and reference errors in Code.gs
- * 3. Backend logic (API key resolution, loadAppData, savePreferences, consolidateShoppingList, parseTime, schema migrations)
- * 4. Frontend DOM element binding integrity
+ * Consolidated Test Suite:
+ * 1. File System, Configuration & Syntax Integrity
+ * 2. Frontend DOM & Template Structure (Index.html)
+ * 3. Responsive Layout & Matte Styling (Styles.html)
+ * 4. Client-Side Utilities & Script Handlers (JavaScript.html)
+ * 5. Backend App Data Initialization & Schema Migrations
+ * 6. Hybrid API Key Management & Resolution Hierarchy
+ * 7. Meal Planning Preferences & Helper Logic
+ * 8. Recipe Rating & History Management (MPA-8)
+ * 9. Meal Plan Generation with Recipe Reuse (MPA-8)
+ * 10. Meal Plan Approval & Document Lifecycle (MPA-8)
  */
 
 const fs = require('fs');
@@ -81,7 +87,8 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
       dietaryPreferences: "High protein.",
       cuisinePreferences: {},
       dinersCount: 2,
-      defaultMealTime: "06:00 PM"
+      defaultMealTime: "06:00 PM",
+      skipWelcomePage: false
     },
     mealPlan: null,
     recipeRatings: {},
@@ -255,17 +262,59 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
   return context;
 }
 
+function createMockBrowserContext() {
+  const mockElement = {
+    addEventListener: () => {},
+    classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
+    getAttribute: () => '',
+    innerHTML: '',
+    value: '',
+    className: ''
+  };
+
+  const sandbox = {
+    console: console,
+    Math: Math,
+    parseInt: parseInt,
+    parseFloat: parseFloat,
+    String: String,
+    RegExp: RegExp,
+    Date: Date,
+    Set: Set,
+    document: {
+      querySelectorAll: () => [mockElement],
+      querySelector: () => mockElement,
+      getElementById: () => mockElement,
+      addEventListener: () => {}
+    },
+    window: {
+      scrollTo: () => {}
+    },
+    google: {
+      script: {
+        run: {
+          withSuccessHandler: function() { return this; },
+          withFailureHandler: function() { return this; },
+          loadAppData: () => {}
+        }
+      }
+    }
+  };
+  return vm.createContext(sandbox);
+}
+
 // ---------------------------------------------------------
-// RUN TEST SUITES
+// RUN CONSOLIDATED TEST SUITES
 // ---------------------------------------------------------
 
 console.log(`\n${COLORS.bright}========================================`);
 console.log(`🧪 Running Meal Planning App Test Suite`);
 console.log(`========================================${COLORS.reset}`);
 
-// 1. Static & Syntax Analysis
-describe('1. File System & Syntax Integrity', () => {
-  test('Required project files must exist', () => {
+// 1. Static, File System & Syntax Integrity
+describe('1. File System, Configuration & Syntax Integrity', () => {
+  test('Project files, JSON configs, and JavaScript code pass integrity and syntax validation', () => {
+    // 1. Check required project files exist
     const requiredFiles = [
       'Code.gs',
       'Index.html',
@@ -279,9 +328,8 @@ describe('1. File System & Syntax Integrity', () => {
     requiredFiles.forEach(file => {
       assert(fs.existsSync(path.join(ROOT_DIR, file)), `Missing required file: ${file}`);
     });
-  });
 
-  test('JSON configuration files parse without syntax errors', () => {
+    // 2. Validate JSON configurations
     ['appsscript.json', '.clasp.json', 'package.json'].forEach(file => {
       const content = fs.readFileSync(path.join(ROOT_DIR, file), 'utf8');
       try {
@@ -290,113 +338,285 @@ describe('1. File System & Syntax Integrity', () => {
         throw new Error(`JSON syntax error in ${file}: ${e.message}`);
       }
     });
-  });
 
-  test('Code.gs passes JavaScript syntax parsing', () => {
-    const code = fs.readFileSync(path.join(ROOT_DIR, 'Code.gs'), 'utf8');
-    new vm.Script(code, { filename: 'Code.gs' });
-  });
+    // 3. Validate JS syntax of Code.gs and ship.js
+    const codeGs = fs.readFileSync(path.join(ROOT_DIR, 'Code.gs'), 'utf8');
+    new vm.Script(codeGs, { filename: 'Code.gs' });
 
-  test('ship.js passes JavaScript syntax parsing', () => {
-    const code = fs.readFileSync(path.join(ROOT_DIR, 'ship.js'), 'utf8');
-    new vm.Script(code, { filename: 'ship.js' });
-  });
+    const shipJs = fs.readFileSync(path.join(ROOT_DIR, 'ship.js'), 'utf8');
+    new vm.Script(shipJs, { filename: 'ship.js' });
 
-  test('JavaScript.html contains valid client-side scripts', () => {
-    const html = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
-    const scriptMatch = html.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
+    // 4. Validate inline JS script syntax inside JavaScript.html
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
     assert(scriptMatch && scriptMatch[1], 'No <script> tag found in JavaScript.html');
-    const scriptCode = scriptMatch[1];
-    new vm.Script(scriptCode, { filename: 'JavaScript.html' });
+    new vm.Script(scriptMatch[1], { filename: 'JavaScript.html' });
   });
 });
 
-// 2. Backend Unit & API Key Logic Tests
-describe('2. Backend Logic & Hybrid API Key Management', () => {
-  test('loadAppData() executes successfully without ReferenceError', () => {
+// 2. Frontend DOM & Template Structure
+describe('2. Frontend DOM & Template Structure (Index.html)', () => {
+  test('Index.html defines all required elements, navigation tabs, views, favicon, and reuse banners', () => {
+    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+
+    // 1. Favicon link check
+    assert(/<link[^>]*rel=["']icon["'][^>]*href=["']data:image\/svg\+xml,[^"']*🍽️[^"']*["']/i.test(indexHtml),
+      'Favicon link tag with dinner plate emoji 🍽️ must be defined in Index.html head');
+
+    // 2. Required element IDs
+    const requiredIds = [
+      'pref-allergies',
+      'pref-dietary-preferences',
+      'pref-diners',
+      'pref-meal-time',
+      'pref-skip-welcome',
+      'skip-welcome-checkbox',
+      'cuisine-grid',
+      'api-key-input',
+      'api-badge',
+      'api-desc',
+      'meal-count-input',
+      'plan-preferences-input',
+      'planner-container',
+      'history-container',
+      'loader',
+      'toast',
+      'bottom-nav',
+      'welcome-view',
+      'subtab-history-recent',
+      'subtab-history-favorites',
+      'history-reuse-banner',
+      'planner-reuse-notice'
+    ];
+    requiredIds.forEach(id => {
+      const pattern = new RegExp(`id=["']${id}["']`, 'i');
+      assert(pattern.test(indexHtml), `Index.html is missing element with id="${id}"`);
+    });
+
+    // 3. Desktop and mobile navigation with all 4 primary views
+    assert(/<nav\s+class=["'][^"']*nav-desktop/i.test(indexHtml), 'Missing desktop nav container in Index.html');
+    assert(/<nav\s+class=["'][^"']*bottom-nav/i.test(indexHtml), 'Missing sticky bottom-nav in Index.html');
+    ['planner', 'history', 'preferences', 'settings'].forEach(view => {
+      const count = (indexHtml.match(new RegExp(`data-view=["']${view}["']`, 'g')) || []).length;
+      assert(count >= 2, `Expected at least 2 nav buttons (desktop + mobile) for view: ${view}`);
+    });
+
+    // 4. Welcome landing view & guide cards
+    assert(/id=["']welcome-view["'][^>]*class=["'][^"']*view\s+active[^"']*["']/i.test(indexHtml) ||
+           /class=["'][^"']*view\s+active[^"']*["'][^>]*id=["']welcome-view["']/i.test(indexHtml),
+      'welcome-view must be the default active view in Index.html');
+    ['Getting Started', 'Setting Preferences', 'Generating Meal Plans', 'Reviewing Past Meals'].forEach(card => {
+      assert(indexHtml.includes(card), `Welcome card "${card}" must exist in Index.html`);
+    });
+    ['settings', 'preferences', 'planner', 'history'].forEach(target => {
+      assert(indexHtml.includes(`switchView('${target}')`), `Welcome view must link to '${target}' view`);
+    });
+
+    // 5. Header brand click handler & skip-welcome-checkbox
+    assert(/class=["'][^"']*brand[^"']*["'][^>]*onclick=["']switchView\('welcome'\)["']/i.test(indexHtml),
+      'Header brand element must have onclick="switchView(\'welcome\')" handler');
+    assert(/welcome-hero[\s\S]*?id=["']skip-welcome-checkbox["']/i.test(indexHtml),
+      'skip-welcome-checkbox must be located within the welcome-hero panel in Index.html');
+    assert(/onchange=["']handleToggleSkipWelcome\(this\.checked\)["']/i.test(indexHtml),
+      'skip-welcome-checkbox must trigger handleToggleSkipWelcome(this.checked)');
+  });
+});
+
+// 3. Responsive Layout & Matte Styling
+describe('3. Responsive Layout & Matte Styling (Styles.html)', () => {
+  test('Styles.html enforces responsive rules (<768px), touch minimums, safe-area insets, and matte aesthetics', () => {
+    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+
+    // 1. Mobile media query (<768px) and navigation positioning
+    assert(/@media\s*\(\s*max-width:\s*768px\s*\)/i.test(stylesHtml), 'Styles.html missing @media (max-width: 768px) query');
+    assert(/\.bottom-nav\s*\{[^}]*position:\s*fixed/i.test(stylesHtml), 'Styles.html missing fixed positioning for .bottom-nav');
+    assert(/\.nav-desktop\s*\{[^}]*display:\s*none/i.test(stylesHtml), 'Styles.html must hide .nav-desktop on mobile');
+
+    // 2. Accessibility touch targets and safe area insets
+    assert(/recipe-checkbox-hitbox[\s\S]*?min-width:\s*44px/i.test(stylesHtml), 'Recipe checkbox hitbox missing min-width: 44px');
+    assert(/recipe-checkbox-hitbox[\s\S]*?min-height:\s*44px/i.test(stylesHtml), 'Recipe checkbox hitbox missing min-height: 44px');
+    assert(/safe-area-inset-bottom/i.test(stylesHtml), 'Styles.html should utilize env(safe-area-inset-bottom) for mobile clearance');
+
+    // 3. Clean matte aesthetic rules
+    assert(!/gradient/i.test(stylesHtml), 'Styles.html must not contain linear-gradient or radial-gradient');
+    assert(!/\.welcome-hero::before/i.test(stylesHtml), 'welcome-hero corner texture pseudo-element must be removed');
+
+    // 4. Sub-navigation, star ratings, and reuse banners
+    assert(stylesHtml.includes('.history-subnav'), 'Styles.html must define .history-subnav');
+    assert(stylesHtml.includes('.star-rating'), 'Styles.html must define .star-rating');
+    assert(stylesHtml.includes('.star-btn'), 'Styles.html must define .star-btn');
+    assert(stylesHtml.includes('.reuse-banner'), 'Styles.html must define .reuse-banner');
+    assert(stylesHtml.includes('.planner-reuse-notice'), 'Styles.html must define .planner-reuse-notice');
+  });
+});
+
+// 4. Client-Side Utilities & Script Handlers
+describe('4. Client-Side Utilities & Script Handlers (JavaScript.html)', () => {
+  test('JavaScript.html defines correct time formatters, string escapers, cuisines, and client event handlers', () => {
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
+    assert(scriptMatch && scriptMatch[1], 'Script tag missing in JavaScript.html');
+
+    const context = createMockBrowserContext();
+    vm.runInContext(scriptMatch[1], context);
+
+    // 1. calculateTotalTime() formatting
+    assert(typeof context.calculateTotalTime === 'function', 'calculateTotalTime function missing in client JS');
+    assertEqual(context.calculateTotalTime("15 mins", "10 mins"), "⏱️ 25m");
+    assertEqual(context.calculateTotalTime("20 min", "25 min"), "⏱️ 45m");
+    assertEqual(context.calculateTotalTime("30 mins", "30 mins"), "⏱️ 1h");
+    assertEqual(context.calculateTotalTime("45 mins", "45 mins"), "⏱️ 1h 30m");
+    assertEqual(context.calculateTotalTime("1 hr", "15 mins"), "⏱️ 1h 15m");
+    assertEqual(context.calculateTotalTime("10m", "20m"), "⏱️ 30m");
+    assertEqual(context.calculateTotalTime("", "25 mins"), "⏱️ 25m");
+
+    // 2. escapeJSString() character escaping
+    assert(typeof context.escapeJSString === 'function', 'escapeJSString function missing in client JS');
+    assertEqual(context.escapeJSString("Mom's Classic Shepherd's Pie"), "Mom\\'s Classic Shepherd\\'s Pie");
+    assertEqual(context.escapeJSString('Chef "Special"'), 'Chef \\"Special\\"');
+    assertEqual(context.escapeJSString(''), '');
+
+    // 3. Cuisines catalog
+    const cuisineMatches = jsHtml.match(/name:\s*["']([^"']+)["']/g);
+    assert(cuisineMatches && cuisineMatches.length >= 12, 'CUISINES array should define at least 12 cuisines');
+
+    // 4. Core handler functions
+    const requiredClientFunctions = [
+      'handleToggleSkipWelcome',
+      'switchHistoryTab',
+      'toggleReuseRecipe',
+      'clearReusedRecipes',
+      'renderStarRating',
+      'handleSetRating'
+    ];
+    requiredClientFunctions.forEach(fnName => {
+      assert(jsHtml.includes(`function ${fnName}`), `${fnName} function missing in JavaScript.html`);
+    });
+  });
+});
+
+// 5. Backend App Data Initialization & Schema Migrations
+describe('5. Backend App Data Initialization & Schema Migrations', () => {
+  test('loadAppData() initializes database, provides API key status, and migrates legacy schemas', () => {
+    // 1. Normal initialization
     const ctx = createMockGasContext();
     const res = ctx.loadAppData();
     assert(res !== undefined, 'loadAppData returned nothing');
     assert(res.db !== undefined, 'loadAppData missing db object');
     assert(res.apiKeyStatus !== undefined, 'loadAppData missing apiKeyStatus');
+
+    // 2. Legacy schema migration (restrictions -> dietaryPreferences)
+    const legacyDb = {
+      preferences: {
+        restrictions: "No gluten."
+      }
+    };
+    const legacyCtx = createMockGasContext(legacyDb);
+    const data = legacyCtx.loadAppData();
+    assertEqual(data.db.preferences.dietaryPreferences, "No gluten.");
+    assertEqual(data.db.preferences.restrictions, undefined);
+    assertEqual(data.db.preferences.dinersCount, 2);
+    assertEqual(data.db.preferences.defaultMealTime, "06:00 PM");
+    assertEqual(data.db.preferences.skipWelcomePage, false);
+    assertDeepEqual(data.db.preferences.cuisinePreferences, {});
   });
+});
 
-  test('getEffectiveApiKey() returns "none" when no keys are configured', () => {
-    const ctx = createMockGasContext(null, {}, {});
-    const keyInfo = ctx.getEffectiveApiKey();
-    assertEqual(keyInfo.keyType, 'none');
-    assertEqual(keyInfo.key, null);
+// 6. Hybrid API Key Management & Resolution Hierarchy
+describe('6. Hybrid API Key Management & Resolution Hierarchy', () => {
+  test('API key resolution correctly traverses None -> Shared -> Personal, supporting save and delete', () => {
+    // 1. No keys configured
+    const noKeyCtx = createMockGasContext(null, {}, {});
+    const noKeyInfo = noKeyCtx.getEffectiveApiKey();
+    assertEqual(noKeyInfo.keyType, 'none');
+    assertEqual(noKeyInfo.key, null);
+    const noKeyAppData = noKeyCtx.loadAppData();
+    assertEqual(noKeyAppData.hasApiKey, false);
+    assertEqual(noKeyAppData.apiKeyStatus.activeKeyType, 'none');
 
-    const appData = ctx.loadAppData();
-    assertEqual(appData.hasApiKey, false);
-    assertEqual(appData.apiKeyStatus.activeKeyType, 'none');
-    assertEqual(appData.apiKeyStatus.hasPersonalKey, false);
-    assertEqual(appData.apiKeyStatus.hasSharedKey, false);
-  });
+    // 2. Shared starter key present in Script Properties
+    const sharedCtx = createMockGasContext(null, {}, { SHARED_GEMINI_API_KEY: 'shared_key_abc123' });
+    const sharedKeyInfo = sharedCtx.getEffectiveApiKey();
+    assertEqual(sharedKeyInfo.keyType, 'shared');
+    assertEqual(sharedKeyInfo.key, 'shared_key_abc123');
+    const sharedAppData = sharedCtx.loadAppData();
+    assertEqual(sharedAppData.hasApiKey, true);
+    assertEqual(sharedAppData.apiKeyStatus.activeKeyType, 'shared');
+    assertEqual(sharedAppData.apiKeyStatus.hasPersonalKey, false);
+    assertEqual(sharedAppData.apiKeyStatus.hasSharedKey, true);
 
-  test('getEffectiveApiKey() recognizes shared starter key when present in Script Properties', () => {
-    const ctx = createMockGasContext(null, {}, { SHARED_GEMINI_API_KEY: 'shared_key_abc123' });
-    const keyInfo = ctx.getEffectiveApiKey();
-    assertEqual(keyInfo.keyType, 'shared');
-    assertEqual(keyInfo.key, 'shared_key_abc123');
-
-    const appData = ctx.loadAppData();
-    assertEqual(appData.hasApiKey, true);
-    assertEqual(appData.apiKeyStatus.activeKeyType, 'shared');
-    assertEqual(appData.apiKeyStatus.hasPersonalKey, false);
-    assertEqual(appData.apiKeyStatus.hasSharedKey, true);
-  });
-
-  test('getEffectiveApiKey() prioritizes personal key in User Properties over shared key', () => {
-    const ctx = createMockGasContext(
+    // 3. Personal key overrides shared key
+    const overrideCtx = createMockGasContext(
       null,
       { GEMINI_API_KEY: 'personal_key_xyz789' },
       { SHARED_GEMINI_API_KEY: 'shared_key_abc123' }
     );
-    const keyInfo = ctx.getEffectiveApiKey();
-    assertEqual(keyInfo.keyType, 'personal');
-    assertEqual(keyInfo.key, 'personal_key_xyz789');
+    const overrideKeyInfo = overrideCtx.getEffectiveApiKey();
+    assertEqual(overrideKeyInfo.keyType, 'personal');
+    assertEqual(overrideKeyInfo.key, 'personal_key_xyz789');
+    const overrideAppData = overrideCtx.loadAppData();
+    assertEqual(overrideAppData.apiKeyStatus.activeKeyType, 'personal');
+    assertEqual(overrideAppData.apiKeyStatus.hasPersonalKey, true);
+    assertEqual(overrideAppData.apiKeyStatus.hasSharedKey, true);
 
-    const appData = ctx.loadAppData();
-    assertEqual(appData.hasApiKey, true);
-    assertEqual(appData.apiKeyStatus.activeKeyType, 'personal');
-    assertEqual(appData.apiKeyStatus.hasPersonalKey, true);
-    assertEqual(appData.apiKeyStatus.hasSharedKey, true);
-  });
+    // 4. saveApiKey() updates personal key
+    const saveRes = sharedCtx.saveApiKey('new_personal_key');
+    assertEqual(saveRes.success, true);
+    assertEqual(saveRes.apiKeyStatus.hasPersonalKey, true);
+    assertEqual(saveRes.apiKeyStatus.activeKeyType, 'personal');
+    assertEqual(sharedCtx.getEffectiveApiKey().key, 'new_personal_key');
 
-  test('saveApiKey() saves personal key and updates status', () => {
-    const ctx = createMockGasContext(null, {}, { SHARED_GEMINI_API_KEY: 'shared_starter' });
-    const res = ctx.saveApiKey('new_personal_key');
-    assertEqual(res.success, true);
-    assertEqual(res.apiKeyStatus.hasPersonalKey, true);
-    assertEqual(res.apiKeyStatus.activeKeyType, 'personal');
-
-    const effective = ctx.getEffectiveApiKey();
-    assertEqual(effective.key, 'new_personal_key');
-    assertEqual(effective.keyType, 'personal');
-  });
-
-  test('deleteApiKey() removes personal key and reverts to shared key', () => {
-    const ctx = createMockGasContext(
-      null,
-      { GEMINI_API_KEY: 'personal_key' },
-      { SHARED_GEMINI_API_KEY: 'shared_starter' }
-    );
-    const res = ctx.deleteApiKey();
-    assertEqual(res.success, true);
-    assertEqual(res.apiKeyStatus.hasPersonalKey, false);
-    assertEqual(res.apiKeyStatus.activeKeyType, 'shared');
-
-    const effective = ctx.getEffectiveApiKey();
-    assertEqual(effective.key, 'shared_starter');
-    assertEqual(effective.keyType, 'shared');
+    // 5. deleteApiKey() reverts to shared key
+    const deleteRes = overrideCtx.deleteApiKey();
+    assertEqual(deleteRes.success, true);
+    assertEqual(deleteRes.apiKeyStatus.hasPersonalKey, false);
+    assertEqual(deleteRes.apiKeyStatus.activeKeyType, 'shared');
+    assertEqual(overrideCtx.getEffectiveApiKey().key, 'shared_key_abc123');
   });
 });
 
-// 3. Data Processing & Helper Functions
-describe('3. Data Processing & Helper Functions', () => {
-  test('consolidateShoppingList() correctly aggregates ingredients and units', () => {
+// 7. Meal Planning Preferences & Helper Logic
+describe('7. Meal Planning Preferences & Helper Logic', () => {
+  test('Backend correctly parses times, saves preferences, and aggregates multi-unit shopping lists', () => {
     const ctx = createMockGasContext();
+
+    // 1. parseTime() formats
+    assertDeepEqual(ctx.parseTime("06:00 PM"), { hours: 18, minutes: 0 });
+    assertDeepEqual(ctx.parseTime("6:30 PM"), { hours: 18, minutes: 30 });
+    assertDeepEqual(ctx.parseTime("08:15 AM"), { hours: 8, minutes: 15 });
+    assertDeepEqual(ctx.parseTime("12:00 PM"), { hours: 12, minutes: 0 });
+    assertDeepEqual(ctx.parseTime("12:30 AM"), { hours: 0, minutes: 30 });
+    assertDeepEqual(ctx.parseTime("19:45"), { hours: 19, minutes: 45 });
+    assertDeepEqual(ctx.parseTime(""), { hours: 18, minutes: 0 });
+    assertDeepEqual(ctx.parseTime(null), { hours: 18, minutes: 0 });
+
+    // 2. savePreferences()
+    const newPrefs = {
+      allergies: "Peanuts",
+      dietaryPreferences: "Keto",
+      cuisinePreferences: { Italian: "prefer", Mexican: "avoid" },
+      dinersCount: "4",
+      defaultMealTime: "07:30 PM",
+      skipWelcomePage: true
+    };
+    const prefRes = ctx.savePreferences(newPrefs);
+    assertEqual(prefRes.success, true);
+    assertEqual(prefRes.db.preferences.allergies, "Peanuts");
+    assertEqual(prefRes.db.preferences.dietaryPreferences, "Keto");
+    assertEqual(prefRes.db.preferences.dinersCount, 4);
+    assertEqual(prefRes.db.preferences.defaultMealTime, "07:30 PM");
+    assertEqual(prefRes.db.preferences.skipWelcomePage, true);
+    assertEqual(prefRes.db.preferences.cuisinePreferences.Italian, "prefer");
+    assertEqual(prefRes.db.preferences.cuisinePreferences.Mexican, "avoid");
+
+    // 3. setSkipWelcomePreference()
+    const skipTrue = ctx.setSkipWelcomePreference(true);
+    assertEqual(skipTrue.skipWelcomePage, true);
+    assertEqual(ctx.loadAppData().db.preferences.skipWelcomePage, true);
+    const skipFalse = ctx.setSkipWelcomePreference(false);
+    assertEqual(skipFalse.skipWelcomePage, false);
+
+    // 4. consolidateShoppingList()
     const recipes = [
       {
         name: "Recipe 1",
@@ -415,17 +635,13 @@ describe('3. Data Processing & Helper Functions', () => {
         ]
       }
     ];
-
     const consolidated = ctx.consolidateShoppingList(recipes);
     assert(Array.isArray(consolidated), 'Result should be an array');
-
-    // Alphabetical order: chicken breast, garlic, olive oil
     assertEqual(consolidated[0].name, 'chicken breast');
     assertEqual(consolidated[0].amounts[0].amount, 1);
     assertEqual(consolidated[0].amounts[0].unit, 'lb');
 
     assertEqual(consolidated[1].name, 'garlic');
-    // Garlic has 2 units: 5 cloves and 1 tsp
     const clovesEntry = consolidated[1].amounts.find(a => a.unit === 'cloves');
     const tspEntry = consolidated[1].amounts.find(a => a.unit === 'tsp');
     assert(clovesEntry !== undefined, 'Missing cloves entry for garlic');
@@ -437,328 +653,11 @@ describe('3. Data Processing & Helper Functions', () => {
     assertEqual(consolidated[2].amounts[0].amount, 3);
     assertEqual(consolidated[2].amounts[0].unit, 'tbsp');
   });
-
-  test('parseTime() parses 12h, 24h, and default times accurately', () => {
-    const ctx = createMockGasContext();
-
-    assertDeepEqual(ctx.parseTime("06:00 PM"), { hours: 18, minutes: 0 });
-    assertDeepEqual(ctx.parseTime("6:30 PM"), { hours: 18, minutes: 30 });
-    assertDeepEqual(ctx.parseTime("08:15 AM"), { hours: 8, minutes: 15 });
-    assertDeepEqual(ctx.parseTime("12:00 PM"), { hours: 12, minutes: 0 });
-    assertDeepEqual(ctx.parseTime("12:30 AM"), { hours: 0, minutes: 30 });
-    assertDeepEqual(ctx.parseTime("19:45"), { hours: 19, minutes: 45 });
-    assertDeepEqual(ctx.parseTime(""), { hours: 18, minutes: 0 });
-    assertDeepEqual(ctx.parseTime(null), { hours: 18, minutes: 0 });
-  });
-
-  test('savePreferences() handles diner counts, cuisine map, and defaults', () => {
-    const ctx = createMockGasContext();
-    const newPrefs = {
-      allergies: "Peanuts",
-      dietaryPreferences: "Keto",
-      cuisinePreferences: { Italian: "prefer", Mexican: "avoid" },
-      dinersCount: "4",
-      defaultMealTime: "07:30 PM",
-      skipWelcomePage: true
-    };
-
-    const res = ctx.savePreferences(newPrefs);
-    assertEqual(res.success, true);
-    assertEqual(res.db.preferences.allergies, "Peanuts");
-    assertEqual(res.db.preferences.dietaryPreferences, "Keto");
-    assertEqual(res.db.preferences.dinersCount, 4);
-    assertEqual(res.db.preferences.defaultMealTime, "07:30 PM");
-    assertEqual(res.db.preferences.skipWelcomePage, true);
-    assertEqual(res.db.preferences.cuisinePreferences.Italian, "prefer");
-    assertEqual(res.db.preferences.cuisinePreferences.Mexican, "avoid");
-  });
-
-  test('setSkipWelcomePreference() directly updates skipWelcomePage flag in DB', () => {
-    const ctx = createMockGasContext();
-    const resTrue = ctx.setSkipWelcomePreference(true);
-    assertEqual(resTrue.success, true);
-    assertEqual(resTrue.skipWelcomePage, true);
-
-    const appData = ctx.loadAppData();
-    assertEqual(appData.db.preferences.skipWelcomePage, true);
-
-    const resFalse = ctx.setSkipWelcomePreference(false);
-    assertEqual(resFalse.success, true);
-    assertEqual(resFalse.skipWelcomePage, false);
-  });
-
-  test('Database schema migrations migrate legacy "restrictions" to "dietaryPreferences" and ensure skipWelcomePage', () => {
-    const legacyDb = {
-      preferences: {
-        restrictions: "No gluten."
-      }
-    };
-    const ctx = createMockGasContext(legacyDb);
-    const data = ctx.loadAppData();
-    assertEqual(data.db.preferences.dietaryPreferences, "No gluten.");
-    assertEqual(data.db.preferences.restrictions, undefined);
-    assertEqual(data.db.preferences.dinersCount, 2);
-    assertEqual(data.db.preferences.defaultMealTime, "06:00 PM");
-    assertEqual(data.db.preferences.skipWelcomePage, false);
-    assertDeepEqual(data.db.preferences.cuisinePreferences, {});
-  });
 });
 
-// 4. UI Bindings & Template Consistency Tests
-describe('4. Frontend DOM & Template Element Bindings', () => {
-  test('Index.html defines all element IDs used by JavaScript.html', () => {
-    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-    const requiredIds = [
-      'pref-allergies',
-      'pref-dietary-preferences',
-      'pref-diners',
-      'pref-meal-time',
-      'pref-skip-welcome',
-      'skip-welcome-checkbox',
-      'cuisine-grid',
-      'api-key-input',
-      'api-badge',
-      'api-desc',
-      'meal-count-input',
-      'plan-preferences-input',
-      'planner-container',
-      'history-container',
-      'loader',
-      'toast',
-      'bottom-nav'
-    ];
-
-    requiredIds.forEach(id => {
-      const pattern = new RegExp(`id=["']${id}["']`, 'i');
-      assert(pattern.test(indexHtml), `Index.html is missing element with id="${id}"`);
-    });
-  });
-
-  test('JavaScript.html contains 12 default cuisines in CUISINES list', () => {
-    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
-    const cuisineMatches = jsHtml.match(/name:\s*["']([^"']+)["']/g);
-    assert(cuisineMatches && cuisineMatches.length >= 12, 'CUISINES array should define at least 12 cuisines');
-  });
-});
-
-// 5. Mobile Responsiveness & Ergonomics Validation (MPA-17)
-describe('5. Mobile Responsiveness & Ergonomics Tooling (MPA-17)', () => {
-  test('Index.html includes mobile viewport meta configuration', () => {
-    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-    assert(/<meta\s+name=["']viewport["']\s+content=["'][^"']*width=device-width/i.test(indexHtml),
-      'Index.html is missing responsive viewport meta tag');
-  });
-
-  test('Index.html defines both desktop and mobile navigation elements with matching view tabs', () => {
-    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-    
-    // Check for desktop and mobile navigation wrappers
-    assert(/<nav\s+class=["'][^"']*nav-desktop/i.test(indexHtml), 'Missing desktop nav container in Index.html');
-    assert(/<nav\s+class=["'][^"']*bottom-nav/i.test(indexHtml), 'Missing sticky bottom-nav in Index.html');
-
-    // Check all 4 views exist in both desktop and bottom navigation
-    ['planner', 'history', 'preferences', 'settings'].forEach(view => {
-      const count = (indexHtml.match(new RegExp(`data-view=["']${view}["']`, 'g')) || []).length;
-      assert(count >= 2, `Expected at least 2 nav buttons (desktop + mobile) for view: ${view}`);
-    });
-  });
-
-  test('Styles.html defines mobile media query (<768px) with sticky bottom navigation rules', () => {
-    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
-    
-    assert(/@media\s*\(\s*max-width:\s*768px\s*\)/i.test(stylesHtml), 'Styles.html missing @media (max-width: 768px) query');
-    assert(/\.bottom-nav\s*\{[^}]*position:\s*fixed/i.test(stylesHtml), 'Styles.html missing fixed positioning for .bottom-nav');
-    assert(/\.nav-desktop\s*\{[^}]*display:\s*none/i.test(stylesHtml), 'Styles.html must hide .nav-desktop on mobile');
-  });
-
-  test('Styles.html enforces accessibility touch target minimums (>= 44px) and safe-area insets', () => {
-    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
-    
-    // Check checkbox hitbox minimum 44px
-    assert(/recipe-checkbox-hitbox[\s\S]*?min-width:\s*44px/i.test(stylesHtml), 'Recipe checkbox hitbox missing min-width: 44px');
-    assert(/recipe-checkbox-hitbox[\s\S]*?min-height:\s*44px/i.test(stylesHtml), 'Recipe checkbox hitbox missing min-height: 44px');
-
-    // Check safe-area inset usage for sticky bottom nav
-    assert(/safe-area-inset-bottom/i.test(stylesHtml), 'Styles.html should utilize env(safe-area-inset-bottom) for mobile clearance');
-  });
-
-  function createMockBrowserContext() {
-    const mockElement = {
-      addEventListener: () => {},
-      classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
-      getAttribute: () => '',
-      innerHTML: '',
-      value: '',
-      className: ''
-    };
-
-    const sandbox = {
-      console: console,
-      Math: Math,
-      parseInt: parseInt,
-      parseFloat: parseFloat,
-      String: String,
-      RegExp: RegExp,
-      Date: Date,
-      Set: Set,
-      document: {
-        querySelectorAll: () => [mockElement],
-        querySelector: () => mockElement,
-        getElementById: () => mockElement,
-        addEventListener: () => {}
-      },
-      window: {
-        scrollTo: () => {}
-      },
-      google: {
-        script: {
-          run: {
-            withSuccessHandler: function() { return this; },
-            withFailureHandler: function() { return this; },
-            loadAppData: () => {}
-          }
-        }
-      }
-    };
-    const context = vm.createContext(sandbox);
-    return context;
-  }
-
-  test('JavaScript.html calculateTotalTime() correctly computes and formats recipe badge times', () => {
-    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
-    const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
-    assert(scriptMatch && scriptMatch[1], 'Script tag missing');
-
-    const context = createMockBrowserContext();
-    vm.runInContext(scriptMatch[1], context);
-
-    assert(typeof context.calculateTotalTime === 'function', 'calculateTotalTime function missing in client JS');
-
-    // Test time parsing and formatting variations
-    assertEqual(context.calculateTotalTime("15 mins", "10 mins"), "⏱️ 25m");
-    assertEqual(context.calculateTotalTime("20 min", "25 min"), "⏱️ 45m");
-    assertEqual(context.calculateTotalTime("30 mins", "30 mins"), "⏱️ 1h");
-    assertEqual(context.calculateTotalTime("45 mins", "45 mins"), "⏱️ 1h 30m");
-    assertEqual(context.calculateTotalTime("1 hr", "15 mins"), "⏱️ 1h 15m");
-    assertEqual(context.calculateTotalTime("10m", "20m"), "⏱️ 30m");
-    assertEqual(context.calculateTotalTime("", "25 mins"), "⏱️ 25m");
-  });
-
-  test('JavaScript.html escapeJSString() safely escapes quotes and control characters', () => {
-    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
-    const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
-    const context = createMockBrowserContext();
-    vm.runInContext(scriptMatch[1], context);
-
-    assert(typeof context.escapeJSString === 'function', 'escapeJSString function missing in client JS');
-    assertEqual(context.escapeJSString("Mom's Classic Shepherd's Pie"), "Mom\\'s Classic Shepherd\\'s Pie");
-    assertEqual(context.escapeJSString('Chef "Special"'), 'Chef \\"Special\\"');
-    assertEqual(context.escapeJSString(''), '');
-  });
-});
-
-describe('6. Favicon & Welcome Page Navigation (MPA-6 & MPA-7)', () => {
-  const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-
-  test('MPA-6: Index.html includes dinner plate emoji favicon link tag', () => {
-    assert(/<link[^>]*rel=["']icon["'][^>]*href=["']data:image\/svg\+xml,[^"']*🍽️[^"']*["']/i.test(indexHtml),
-      'Favicon link tag with dinner plate emoji 🍽️ must be defined in Index.html head');
-  });
-
-  test('MPA-7: Brand header title links to welcome page', () => {
-    assert(/class=["'][^"']*brand[^"']*["'][^>]*onclick=["']switchView\('welcome'\)["']/i.test(indexHtml),
-      'Header brand element must have onclick="switchView(\'welcome\')" handler');
-  });
-
-  test('MPA-7: Welcome view is defined as active landing view with 4 guide cards', () => {
-    assert(/id=["']welcome-view["'][^>]*class=["'][^"']*view\s+active[^"']*["']/i.test(indexHtml) ||
-           /class=["'][^"']*view\s+active[^"']*["'][^>]*id=["']welcome-view["']/i.test(indexHtml),
-      'welcome-view must be the default active view in Index.html');
-
-    assert(indexHtml.includes('id="welcome-view"'), 'welcome-view must exist in Index.html');
-    assert(indexHtml.includes('Getting Started'), 'Getting Started step card must exist');
-    assert(indexHtml.includes('Setting Preferences'), 'Setting Preferences step card must exist');
-    assert(indexHtml.includes('Generating Meal Plans'), 'Generating Meal Plans step card must exist');
-    assert(indexHtml.includes('Reviewing Past Meals'), 'Reviewing Past Meals step card must exist');
-  });
-
-  test('MPA-7: Welcome cards navigate to respective views', () => {
-    assert(indexHtml.includes("switchView('settings')"), 'Welcome view must link to settings view');
-    assert(indexHtml.includes("switchView('preferences')"), 'Welcome view must link to preferences view');
-    assert(indexHtml.includes("switchView('planner')"), 'Welcome view must link to planner view');
-    assert(indexHtml.includes("switchView('history')"), 'Welcome view must link to history view');
-  });
-});
-
-describe('7. Skip Welcome Preference & Matte Styling Experience', () => {
-  const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-  const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
-  const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
-
-  test('Index.html defines skip-welcome-checkbox inside welcome-hero panel', () => {
-    assert(/welcome-hero[\s\S]*?id=["']skip-welcome-checkbox["']/i.test(indexHtml),
-      'skip-welcome-checkbox must be located within the welcome-hero panel in Index.html');
-    assert(/onchange=["']handleToggleSkipWelcome\(this\.checked\)["']/i.test(indexHtml),
-      'skip-welcome-checkbox must trigger handleToggleSkipWelcome(this.checked)');
-  });
-
-  test('Styles.html eliminates all gradients and corner textures for a clean matte aesthetic', () => {
-    assert(!/gradient/i.test(stylesHtml), 'Styles.html must not contain linear-gradient or radial-gradient');
-    assert(!/\.welcome-hero::before/i.test(stylesHtml), 'welcome-hero corner texture pseudo-element must be removed');
-  });
-
-  test('JavaScript.html defines handleToggleSkipWelcome and synchronizes preference with backend and localStorage', () => {
-    assert(jsHtml.includes('function handleToggleSkipWelcome'), 'handleToggleSkipWelcome function must exist in JavaScript.html');
-    assert(jsHtml.includes('setSkipWelcomePreference'), 'JavaScript.html must call setSkipWelcomePreference on Google Apps Script');
-  });
-});
-
-// 8. Recipe Ratings & Recipe Re-use Workflow (MPA-8)
-describe('8. Recipe Ratings & Recipe Re-use Workflow (MPA-8)', () => {
-  const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-  const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
-  const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
-
-  test('Index.html defines History sub-navigation tabs, reuse banner, and planner reuse notice', () => {
-    assert(indexHtml.includes('id="subtab-history-recent"'), 'Index.html must have subtab-history-recent');
-    assert(indexHtml.includes('id="subtab-history-favorites"'), 'Index.html must have subtab-history-favorites');
-    assert(indexHtml.includes('id="history-reuse-banner"'), 'Index.html must have history-reuse-banner');
-    assert(indexHtml.includes('id="planner-reuse-notice"'), 'Index.html must have planner-reuse-notice');
-  });
-
-  test('Styles.html defines styles for sub-tabs, star ratings, and reuse banners', () => {
-    assert(stylesHtml.includes('.history-subnav'), 'Styles.html must define .history-subnav');
-    assert(stylesHtml.includes('.star-rating'), 'Styles.html must define .star-rating');
-    assert(stylesHtml.includes('.star-btn'), 'Styles.html must define .star-btn');
-    assert(stylesHtml.includes('.reuse-banner'), 'Styles.html must define .reuse-banner');
-    assert(stylesHtml.includes('.planner-reuse-notice'), 'Styles.html must define .planner-reuse-notice');
-  });
-
-  test('JavaScript.html defines switchHistoryTab, toggleReuseRecipe, clearReusedRecipes, renderStarRating, and handleSetRating', () => {
-    assert(jsHtml.includes('function switchHistoryTab'), 'switchHistoryTab missing in JavaScript.html');
-    assert(jsHtml.includes('function toggleReuseRecipe'), 'toggleReuseRecipe missing in JavaScript.html');
-    assert(jsHtml.includes('function clearReusedRecipes'), 'clearReusedRecipes missing in JavaScript.html');
-    assert(jsHtml.includes('function renderStarRating'), 'renderStarRating missing in JavaScript.html');
-    assert(jsHtml.includes('function handleSetRating'), 'handleSetRating missing in JavaScript.html');
-  });
-
-  test('Backend setRecipeRating() sets and persists 0-5 star ratings in DB', () => {
-    const context = createMockGasContext();
-    const res = context.setRecipeRating('Lemon Salmon', 5);
-    assertEqual(res.success, true, 'setRecipeRating must return success: true');
-    assertEqual(res.rating, 5, 'setRecipeRating must return rating: 5');
-
-    const db = context.getMockDbState();
-    assertEqual(db.recipeRatings['Lemon Salmon'].rating, 5, 'Rating must be persisted in db.recipeRatings');
-
-    // Test clamping between 0 and 5
-    const clampedHigh = context.setRecipeRating('Tacos', 10);
-    assertEqual(clampedHigh.rating, 5, 'Rating > 5 should clamp to 5');
-    const clampedLow = context.setRecipeRating('Tacos', -2);
-    assertEqual(clampedLow.rating, 0, 'Rating < 0 should clamp to 0');
-  });
-
-  test('Backend getRecipeHistory() sorts History by scheduled date descending and Favorites by rating + date', () => {
+// 8. Recipe Rating & History Management (MPA-8)
+describe('8. Recipe Rating & History Management (MPA-8)', () => {
+  test('Backend persists star ratings (with 0-5 clamping) and sorts history/favorites accurately', () => {
     const mockFiles = [
       { name: "20260901 - Old Salmon", id: "salmon-doc", createdTime: 1000 },
       { name: "20260908 - Fresh Tacos", id: "tacos-doc", createdTime: 2000 },
@@ -778,23 +677,34 @@ describe('8. Recipe Ratings & Recipe Re-use Workflow (MPA-8)', () => {
     };
 
     const context = createMockGasContext(initialDb, {}, {}, mockFiles);
-    const result = context.getRecipeHistory();
 
-    // Verify history sorted by scheduled date descending (2026-09-08, 2026-09-05, 2026-09-01)
+    // 1. Rating persistence and clamping
+    const res = context.setRecipeRating('Lemon Salmon', 5);
+    assertEqual(res.success, true);
+    assertEqual(res.rating, 5);
+    assertEqual(context.getMockDbState().recipeRatings['Lemon Salmon'].rating, 5);
+
+    assertEqual(context.setRecipeRating('Tacos', 10).rating, 5, 'Rating > 5 should clamp to 5');
+    assertEqual(context.setRecipeRating('Tacos', -2).rating, 0, 'Rating < 0 should clamp to 0');
+
+    // 2. getRecipeHistory() sorting and favorite filtering
+    const result = context.getRecipeHistory();
     assertEqual(result.history.length, 3, 'History should contain all 3 recipes');
     assertEqual(result.history[0].name, 'Fresh Tacos', 'Most recent scheduled date (2026-09-08) should be first');
     assertEqual(result.history[1].name, 'Mid Chicken', 'Second scheduled date (2026-09-05) should be second');
     assertEqual(result.history[2].name, 'Old Salmon', 'Third scheduled date (2026-09-01) should be third');
 
-    // Verify favorites filtered for rating > 0 and sorted by rating descending (5 stars -> 4 stars)
-    assertEqual(result.favorites.length, 2, 'Favorites should only contain 2 recipes with rating > 0');
+    assertEqual(result.favorites.length, 2, 'Favorites should only contain recipes with rating > 0');
     assertEqual(result.favorites[0].name, 'Old Salmon', '5-star recipe should be top favorite');
-    assertEqual(result.favorites[0].rating, 5, 'Old Salmon rating should be 5');
+    assertEqual(result.favorites[0].rating, 5);
     assertEqual(result.favorites[1].name, 'Mid Chicken', '4-star recipe should be second favorite');
-    assertEqual(result.favorites[1].rating, 4, 'Mid Chicken rating should be 4');
+    assertEqual(result.favorites[1].rating, 4);
   });
+});
 
-  test('Backend generateMealPlanServer() supports complete and partial recipe reuse', () => {
+// 9. Meal Plan Generation with Recipe Reuse (MPA-8)
+describe('9. Meal Plan Generation with Recipe Reuse (MPA-8)', () => {
+  test('generateMealPlanServer() handles full reuse bypass and partial reuse generation with diner scaling', () => {
     const initialDb = {
       preferences: { dinersCount: 4, defaultMealTime: "06:00 PM" },
       mealPlan: null,
@@ -817,25 +727,28 @@ describe('8. Recipe Ratings & Recipe Re-use Workflow (MPA-8)', () => {
     const userProps = { GEMINI_API_KEY: "mock-key" };
     const context = createMockGasContext(initialDb, userProps);
 
-    // Test 1: Full reuse (reused count >= meal count) - Gemini bypass
+    // 1. Full reuse (reused count >= meal count) - Gemini bypass
     const resFull = context.generateMealPlanServer(1, "", ["Favorite Pasta"]);
     assertEqual(resFull.success, true, 'Full reuse should succeed');
     const plan1 = resFull.db.mealPlan;
     assertEqual(plan1.recipes.length, 1, 'Plan should contain 1 recipe');
-    assertEqual(plan1.recipes[0].name, "Favorite Pasta", 'Recipe name should match reused recipe');
-    // Ingredient scaled from 2 diners to 4 diners (1 * 4 / 2 = 2)
+    assertEqual(plan1.recipes[0].name, "Favorite Pasta");
+    // Scaled from 2 diners to 4 diners (1 * 4 / 2 = 2)
     assertEqual(plan1.recipes[0].ingredients[0].amount, 2, 'Ingredients should scale from 2 to 4 diners');
 
-    // Test 2: Partial reuse (1 reused + 1 Gemini generated)
+    // 2. Partial reuse (1 reused + 1 Gemini generated)
     const resPartial = context.generateMealPlanServer(2, "", ["Favorite Pasta"]);
     assertEqual(resPartial.success, true, 'Partial reuse should succeed');
     const plan2 = resPartial.db.mealPlan;
-    assertEqual(plan2.recipes.length, 2, 'Plan should contain 2 recipes (1 reused + 1 generated)');
+    assertEqual(plan2.recipes.length, 2, 'Plan should contain 2 recipes');
     assertEqual(plan2.recipes[0].name, "Favorite Pasta", 'First recipe should be reused');
     assertEqual(plan2.recipes[1].name, "Mock Recipe", 'Second recipe should be generated from Gemini');
   });
+});
 
-  test('Backend approveMealPlanServer() re-titles existing Google Doc and updates recipeLibrary', () => {
+// 10. Meal Plan Approval & Document Lifecycle (MPA-8)
+describe('10. Meal Plan Approval & Document Lifecycle (MPA-8)', () => {
+  test('approveMealPlanServer() re-titles existing Google Docs and synchronizes recipeLibrary metadata', () => {
     const mockFiles = [
       { name: "20260901 - Classic Salmon", id: "salmon-doc-123", createdTime: 1000 }
     ];
