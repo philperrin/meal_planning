@@ -1,6 +1,6 @@
 <script>
   /**
-   * Automated Meal Planning Assistant - Client-side JS
+   * Meal Planning Assistant - Client-side JS
    * Handles UI transitions, dynamic content rendering, card actions, and server calls.
    */
 
@@ -97,7 +97,7 @@
       if (typeof localStorage !== 'undefined' && localStorage.getItem('meal_planner_skip_welcome') === 'true') {
         switchView('planner');
       }
-    } catch (e) {}
+    } catch (e) { }
     loadInitialData();
   });
 
@@ -201,7 +201,7 @@
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('meal_planner_skip_welcome', shouldSkip ? 'true' : 'false');
       }
-    } catch (e) {}
+    } catch (e) { }
 
     // If skip preference is enabled and currently on welcome view, switch to planner
     const welcomeView = document.getElementById('welcome-view');
@@ -397,7 +397,7 @@
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('meal_planner_pantry_ingredients', JSON.stringify(appState.pantryIngredients));
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   function loadPantryIngredientsFromStorage() {
@@ -409,7 +409,7 @@
           if (Array.isArray(parsed)) return parsed;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
     return [];
   }
 
@@ -458,17 +458,17 @@
     } else {
       appState.lockedIndices.add(idx);
     }
-    
+
     // Update db state in memory
     if (appState.db.mealPlan) {
       appState.db.mealPlan.lockedIndices = Array.from(appState.lockedIndices);
     }
-    
+
     renderMealPlan();
     const recipeName = (appState.db.mealPlan && appState.db.mealPlan.recipes && appState.db.mealPlan.recipes[idx])
       ? appState.db.mealPlan.recipes[idx].name
       : `Recipe #${idx + 1}`;
-    
+
     if (appState.lockedIndices.has(idx)) {
       showToast(`🔒 Locked "${recipeName}" (preserved during regeneration).`);
     } else {
@@ -794,9 +794,9 @@
   function renderShoppingListHtml(plan) {
     if (!plan) return '';
     const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
-                         plan.shoppingList ||
-                         consolidateShoppingListClient(plan.recipes);
-    
+      plan.shoppingList ||
+      consolidateShoppingListClient(plan.recipes);
+
     if (!shoppingList || shoppingList.length === 0) return '';
 
     const checkedSet = getStoredShoppingChecklist(plan);
@@ -965,8 +965,8 @@
    */
   function updateShoppingListProgressUI(plan, checkedSet) {
     const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
-                         plan.shoppingList ||
-                         consolidateShoppingListClient(plan.recipes);
+      plan.shoppingList ||
+      consolidateShoppingListClient(plan.recipes);
     if (!shoppingList) return;
 
     const totalItems = shoppingList.length;
@@ -1050,8 +1050,8 @@
    */
   function formatShoppingListText(plan) {
     const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
-                         plan.shoppingList ||
-                         consolidateShoppingListClient(plan.recipes);
+      plan.shoppingList ||
+      consolidateShoppingListClient(plan.recipes);
     if (!shoppingList || shoppingList.length === 0) return '';
 
     const categorized = {};
@@ -1205,7 +1205,7 @@
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem('meal_planner_skip_welcome', shouldSkip ? 'true' : 'false');
           }
-        } catch (e) {}
+        } catch (e) { }
         showToast("Preferences saved successfully!");
       })
       .withFailureHandler(err => {
@@ -1230,7 +1230,7 @@
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem('meal_planner_skip_welcome', isChecked ? 'true' : 'false');
       }
-    } catch (e) {}
+    } catch (e) { }
 
     google.script.run
       .withSuccessHandler(res => {
@@ -1555,9 +1555,9 @@
           <div class="recipe-date-container" onclick="event.stopPropagation()">
             <span class="recipe-date-label">Schedule Prep:</span>
             ${plan.approved
-            ? `<span style="font-size: 13px; font-weight:600; color:var(--accent-secondary);">${defaultDate}</span>`
-            : `<input type="date" class="recipe-date-input" id="date-${idx}" value="${defaultDate}">`
-          }
+          ? `<span style="font-size: 13px; font-weight:600; color:var(--accent-secondary);">${defaultDate}</span>`
+          : `<input type="date" class="recipe-date-input" id="date-${idx}" value="${defaultDate}">`
+        }
           </div>
           
           <div class="recipe-meta-row">
@@ -1610,10 +1610,10 @@
   function handleRemoveRecipeFromPlan(event, idx) {
     if (event) event.stopPropagation();
     if (!appState.db.mealPlan || !appState.db.mealPlan.recipes) return;
-    
+
     const removedRecipe = appState.db.mealPlan.recipes[idx];
     appState.db.mealPlan.recipes.splice(idx, 1);
-    
+
     // Shift locked indices accordingly
     const updatedLocked = new Set();
     appState.lockedIndices.forEach(lockedIdx => {
@@ -1627,10 +1627,10 @@
     if (appState.db.mealPlan) {
       appState.db.mealPlan.lockedIndices = Array.from(updatedLocked);
     }
-    
+
     renderMealPlan();
     showToast(removedRecipe ? `Removed "${removedRecipe.name}" from plan.` : "Removed meal from plan.");
-    
+
     // Persist updated plan to server
     google.script.run
       .withFailureHandler(err => console.error("Failed to sync plan update: " + err.message))
@@ -1775,16 +1775,16 @@
   function switchHistoryTab(tabId) {
     appState.historyTab = tabId;
     const isRecent = tabId === 'recent';
-    
+
     if (els.subtabRecent) els.subtabRecent.classList.toggle('active', isRecent);
     if (els.subtabFavorites) els.subtabFavorites.classList.toggle('active', !isRecent);
-    
+
     if (els.historyDesc) {
       els.historyDesc.textContent = isRecent
         ? "Review the 25 most recently scheduled recipes from your Google Drive. Rate your favorites and check boxes to re-use recipes in your next plan."
         : "Your 25 highest-rated favorite recipes, sorted by rating and recency. Check boxes to re-use recipes in your next plan.";
     }
-    
+
     renderHistoryList();
   }
 
@@ -1816,7 +1816,7 @@
    */
   function updateReuseBanners() {
     const count = appState.reusedRecipes.size;
-    
+
     // History Banner
     if (els.historyReuseBanner) {
       if (count > 0) {
@@ -1828,7 +1828,7 @@
         els.historyReuseBanner.style.display = 'none';
       }
     }
-    
+
     // Planner Notice
     if (els.plannerReuseNotice) {
       if (count > 0) {
@@ -1839,7 +1839,7 @@
             <button type="button" onclick="toggleReuseRecipe('${escapeJSString(name)}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0 2px;font-size:11px;" title="Remove">✕</button>
           </span>
         `).join('');
-        
+
         els.plannerReuseNotice.innerHTML = `
           <div style="flex:1;">
             <div style="font-weight:600; color:var(--accent-primary); margin-bottom:2px;">✦ ${count} Past Recipe${count > 1 ? 's' : ''} Staged for Re-use</div>
@@ -1859,12 +1859,12 @@
    */
   function handleToggleFavorite(event, recipeName, recipeObj) {
     if (event) event.stopPropagation();
-    
+
     // Determine current favorite status
     const currentInfo = (appState.historyData.ratings && appState.historyData.ratings[recipeName]) || (appState.db.recipeRatings && appState.db.recipeRatings[recipeName]);
     const currentlyFav = currentInfo ? (currentInfo.isFavorite === true || currentInfo.rating > 0) : false;
     const newIsFav = !currentlyFav;
-    
+
     // Optimistically update local state
     if (!appState.historyData.ratings) appState.historyData.ratings = {};
     appState.historyData.ratings[recipeName] = {
@@ -1874,7 +1874,7 @@
     };
     if (!appState.db.recipeRatings) appState.db.recipeRatings = {};
     appState.db.recipeRatings[recipeName] = appState.historyData.ratings[recipeName];
-    
+
     // Cache recipe into library if object passed
     if (recipeObj && typeof recipeObj === 'object') {
       if (!appState.db.recipeLibrary) appState.db.recipeLibrary = {};
@@ -1882,7 +1882,7 @@
       appState.db.recipeLibrary[recipeName] = recipeObj;
       appState.historyData.library[recipeName] = recipeObj;
     }
-    
+
     // Update items in history array
     appState.historyData.history.forEach(item => {
       if (item.name === recipeName) {
@@ -1890,7 +1890,7 @@
         item.rating = newIsFav ? 5 : 0;
       }
     });
-    
+
     // Re-filter favorites array
     const favSet = new Map();
     appState.historyData.history.forEach(item => {
@@ -1901,11 +1901,11 @@
       if (b.scheduledTime !== a.scheduledTime) return b.scheduledTime - a.scheduledTime;
       return b.createdTime - a.createdTime;
     }).slice(0, 25);
-    
+
     // Update subtab badges
     if (els.badgeRecentCount) els.badgeRecentCount.textContent = appState.historyData.history.length;
     if (els.badgeFavoritesCount) els.badgeFavoritesCount.textContent = appState.historyData.favorites.length;
-    
+
     // Re-render views as needed
     if (els.historyContainer && appState.currentView === 'history') {
       renderHistoryList();
@@ -1913,13 +1913,13 @@
     if (appState.currentView === 'planner') {
       renderMealPlan();
     }
-    
+
     if (newIsFav) {
       showToast(`⭐ Added "${recipeName}" to Family Favorites!`);
     } else {
       showToast(`Removed "${recipeName}" from Family Favorites.`);
     }
-    
+
     // Call server to persist favorite status in Drive DB
     google.script.run
       .withSuccessHandler(res => {
@@ -1965,11 +1965,11 @@
    */
   function handleQuickAddToPlan(event, recipeName) {
     if (event) event.stopPropagation();
-    
+
     // Retrieve recipe definition from library or history
     const library = (appState.historyData && appState.historyData.library) || (appState.db && appState.db.recipeLibrary) || {};
     let recipe = library[recipeName];
-    
+
     if (!recipe) {
       // Fallback recipe object
       recipe = {
@@ -1987,11 +1987,11 @@
         isReused: true
       };
     }
-    
+
     // Deep clone so diner scaling doesn't mutate cached original
     const clonedRecipe = JSON.parse(JSON.stringify(recipe));
     clonedRecipe.isReused = true;
-    
+
     // Scale ingredients to current household diners
     const origDiners = parseInt(clonedRecipe.originalDiners, 10) || parseInt(appState.db.preferences.dinersCount, 10) || 2;
     const currDiners = parseInt(appState.db.preferences.dinersCount, 10) || 2;
@@ -2003,7 +2003,7 @@
       });
       clonedRecipe.originalDiners = currDiners;
     }
-    
+
     // Initialize or modify meal plan
     if (!appState.db.mealPlan || appState.db.mealPlan.approved) {
       appState.db.mealPlan = {
@@ -2012,7 +2012,7 @@
         recipes: []
       };
     }
-    
+
     // Check if recipe already in active plan
     const alreadyExists = appState.db.mealPlan.recipes.some(r => r.name.toLowerCase() === recipeName.toLowerCase());
     if (alreadyExists) {
@@ -2020,13 +2020,13 @@
       switchView('planner');
       return;
     }
-    
+
     appState.db.mealPlan.recipes.push(clonedRecipe);
     renderMealPlan();
-    
+
     showToast(`✨ Added "${recipeName}" to this week's plan!`);
     switchView('planner');
-    
+
     // Persist updated plan to server
     google.script.run
       .withFailureHandler(err => console.error("Failed to sync plan update: " + err.message))
@@ -2076,11 +2076,11 @@
         appState.db.recipeRatings = Object.assign({}, appState.db.recipeRatings, data.ratings);
       }
     }
-    
+
     // Update subtab badges
     if (els.badgeRecentCount) els.badgeRecentCount.textContent = appState.historyData.history.length;
     if (els.badgeFavoritesCount) els.badgeFavoritesCount.textContent = appState.historyData.favorites.length;
-    
+
     updateReuseBanners();
     renderHistoryList();
   }

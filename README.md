@@ -1,4 +1,4 @@
-# Automated Meal Planning Assistant
+# Meal Planning Assistant
 
 A Google Apps Script-based web application that automates meal planning using Google Gemini AI, creating personalized weekly meal plans with shopping lists and calendar integration.
 
