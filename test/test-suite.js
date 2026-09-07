@@ -480,7 +480,8 @@ describe('4. Frontend DOM & Template Element Bindings', () => {
       'planner-container',
       'history-container',
       'loader',
-      'toast'
+      'toast',
+      'bottom-nav'
     ];
 
     requiredIds.forEach(id => {
@@ -493,6 +494,122 @@ describe('4. Frontend DOM & Template Element Bindings', () => {
     const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
     const cuisineMatches = jsHtml.match(/name:\s*["']([^"']+)["']/g);
     assert(cuisineMatches && cuisineMatches.length >= 12, 'CUISINES array should define at least 12 cuisines');
+  });
+});
+
+// 5. Mobile Responsiveness & Ergonomics Validation (MPA-17)
+describe('5. Mobile Responsiveness & Ergonomics Tooling (MPA-17)', () => {
+  test('Index.html includes mobile viewport meta configuration', () => {
+    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+    assert(/<meta\s+name=["']viewport["']\s+content=["'][^"']*width=device-width/i.test(indexHtml),
+      'Index.html is missing responsive viewport meta tag');
+  });
+
+  test('Index.html defines both desktop and mobile navigation elements with matching view tabs', () => {
+    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+    
+    // Check for desktop and mobile navigation wrappers
+    assert(/<nav\s+class=["'][^"']*nav-desktop/i.test(indexHtml), 'Missing desktop nav container in Index.html');
+    assert(/<nav\s+class=["'][^"']*bottom-nav/i.test(indexHtml), 'Missing sticky bottom-nav in Index.html');
+
+    // Check all 4 views exist in both desktop and bottom navigation
+    ['planner', 'history', 'preferences', 'settings'].forEach(view => {
+      const count = (indexHtml.match(new RegExp(`data-view=["']${view}["']`, 'g')) || []).length;
+      assert(count >= 2, `Expected at least 2 nav buttons (desktop + mobile) for view: ${view}`);
+    });
+  });
+
+  test('Styles.html defines mobile media query (<768px) with sticky bottom navigation rules', () => {
+    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+    
+    assert(/@media\s*\(\s*max-width:\s*768px\s*\)/i.test(stylesHtml), 'Styles.html missing @media (max-width: 768px) query');
+    assert(/\.bottom-nav\s*\{[^}]*position:\s*fixed/i.test(stylesHtml), 'Styles.html missing fixed positioning for .bottom-nav');
+    assert(/\.nav-desktop\s*\{[^}]*display:\s*none/i.test(stylesHtml), 'Styles.html must hide .nav-desktop on mobile');
+  });
+
+  test('Styles.html enforces accessibility touch target minimums (>= 44px) and safe-area insets', () => {
+    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+    
+    // Check checkbox hitbox minimum 44px
+    assert(/recipe-checkbox-hitbox[\s\S]*?min-width:\s*44px/i.test(stylesHtml), 'Recipe checkbox hitbox missing min-width: 44px');
+    assert(/recipe-checkbox-hitbox[\s\S]*?min-height:\s*44px/i.test(stylesHtml), 'Recipe checkbox hitbox missing min-height: 44px');
+
+    // Check safe-area inset usage for sticky bottom nav
+    assert(/safe-area-inset-bottom/i.test(stylesHtml), 'Styles.html should utilize env(safe-area-inset-bottom) for mobile clearance');
+  });
+
+  function createMockBrowserContext() {
+    const mockElement = {
+      addEventListener: () => {},
+      classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} },
+      getAttribute: () => '',
+      innerHTML: '',
+      value: '',
+      className: ''
+    };
+
+    const sandbox = {
+      console: console,
+      Math: Math,
+      parseInt: parseInt,
+      parseFloat: parseFloat,
+      String: String,
+      RegExp: RegExp,
+      Date: Date,
+      Set: Set,
+      document: {
+        querySelectorAll: () => [mockElement],
+        querySelector: () => mockElement,
+        getElementById: () => mockElement,
+        addEventListener: () => {}
+      },
+      window: {
+        scrollTo: () => {}
+      },
+      google: {
+        script: {
+          run: {
+            withSuccessHandler: function() { return this; },
+            withFailureHandler: function() { return this; },
+            loadAppData: () => {}
+          }
+        }
+      }
+    };
+    const context = vm.createContext(sandbox);
+    return context;
+  }
+
+  test('JavaScript.html calculateTotalTime() correctly computes and formats recipe badge times', () => {
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
+    assert(scriptMatch && scriptMatch[1], 'Script tag missing');
+
+    const context = createMockBrowserContext();
+    vm.runInContext(scriptMatch[1], context);
+
+    assert(typeof context.calculateTotalTime === 'function', 'calculateTotalTime function missing in client JS');
+
+    // Test time parsing and formatting variations
+    assertEqual(context.calculateTotalTime("15 mins", "10 mins"), "⏱️ 25m");
+    assertEqual(context.calculateTotalTime("20 min", "25 min"), "⏱️ 45m");
+    assertEqual(context.calculateTotalTime("30 mins", "30 mins"), "⏱️ 1h");
+    assertEqual(context.calculateTotalTime("45 mins", "45 mins"), "⏱️ 1h 30m");
+    assertEqual(context.calculateTotalTime("1 hr", "15 mins"), "⏱️ 1h 15m");
+    assertEqual(context.calculateTotalTime("10m", "20m"), "⏱️ 30m");
+    assertEqual(context.calculateTotalTime("", "25 mins"), "⏱️ 25m");
+  });
+
+  test('JavaScript.html escapeJSString() safely escapes quotes and control characters', () => {
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
+    const context = createMockBrowserContext();
+    vm.runInContext(scriptMatch[1], context);
+
+    assert(typeof context.escapeJSString === 'function', 'escapeJSString function missing in client JS');
+    assertEqual(context.escapeJSString("Mom's Classic Shepherd's Pie"), "Mom\\'s Classic Shepherd\\'s Pie");
+    assertEqual(context.escapeJSString('Chef "Special"'), 'Chef \\"Special\\"');
+    assertEqual(context.escapeJSString(''), '');
   });
 });
 

@@ -73,7 +73,7 @@
    * Setup Navigation Event Listeners
    */
   function setupNavigation() {
-    els.tabs.forEach(tab => {
+    document.querySelectorAll('.nav-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         const targetView = tab.getAttribute('data-view');
         switchView(targetView);
@@ -82,15 +82,24 @@
   }
 
   function switchView(viewId) {
-    // Update Tabs
-    els.tabs.forEach(t => t.classList.remove('active'));
-    const targetTab = document.querySelector(`.nav-tab[data-view="${viewId}"]`);
-    if (targetTab) targetTab.classList.add('active');
+    if (!viewId) return;
 
-    // Update Views
+    // Synchronize All Nav Tabs (both desktop header and sticky bottom nav)
+    document.querySelectorAll('.nav-tab').forEach(t => {
+      if (t.getAttribute('data-view') === viewId) {
+        t.classList.add('active');
+      } else {
+        t.classList.remove('active');
+      }
+    });
+
+    // Update Main Content Views
     els.views.forEach(v => v.classList.remove('active'));
     const targetView = document.getElementById(`${viewId}-view`);
     if (targetView) targetView.classList.add('active');
+
+    // Scroll to top smoothly when switching views on mobile
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Fetch history if the tab is selected
     if (viewId === 'history') {
@@ -207,6 +216,60 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  }
+
+  /**
+   * Escape string for inline JS function arguments
+   */
+  function escapeJSString(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/\\/g, () => "\\\\")
+      .replace(/'/g, () => "\\'")
+      .replace(/"/g, () => '\\"')
+      .replace(/\n/g, () => "\\n")
+      .replace(/\r/g, () => "\\r");
+  }
+
+  /**
+   * Calculate human-friendly total time badge text (e.g. '⏱️ 35m' or '⏱️ 1h 15m')
+   */
+  function calculateTotalTime(prepTime, cookTime) {
+    function parseMinutes(timeStr) {
+      if (!timeStr) return 0;
+      let mins = 0;
+      const str = String(timeStr).toLowerCase();
+
+      // Check for hours e.g. "1 hr", "1.5 hours", "2 hrs"
+      const hrMatch = str.match(/(\d+(?:\.\d+)?)\s*(?:hr|hour)/);
+      if (hrMatch) {
+        mins += parseFloat(hrMatch[1]) * 60;
+      }
+
+      // Check for minutes e.g. "25 mins", "30 min", "15m"
+      const minMatch = str.match(/(\d+)\s*(?:min|m\b)/);
+      if (minMatch) {
+        mins += parseInt(minMatch[1], 10);
+      } else if (!hrMatch) {
+        // Just a plain number e.g. "25"
+        const numMatch = str.match(/(\d+)/);
+        if (numMatch) mins += parseInt(numMatch[1], 10);
+      }
+      return mins;
+    }
+
+    const totalMinutes = Math.round(parseMinutes(prepTime) + parseMinutes(cookTime));
+    if (totalMinutes <= 0) {
+      if (prepTime || cookTime) return `⏱️ ${escapeHtml(prepTime || cookTime)}`;
+      return "⏱️ 25m";
+    }
+
+    if (totalMinutes < 60) {
+      return `⏱️ ${totalMinutes}m`;
+    }
+    const hours = Math.floor(totalMinutes / 60);
+    const remainingMins = totalMinutes % 60;
+    return remainingMins > 0 ? `⏱️ ${hours}h ${remainingMins}m` : `⏱️ ${hours}h`;
   }
 
   /**
@@ -475,49 +538,64 @@
         }
       }
 
+      // Compute total time badge
+      const totalTimeBadge = calculateTotalTime(recipe.prepTime, recipe.cookTime);
+
       // Build recipe details list
-      const ingredientsList = recipe.ingredients.map(ing => `<li>${ing.amount} ${ing.unit} ${ing.name}</li>`).join('');
-      const instructionsList = recipe.instructions.map(step => `<li>${step}</li>`).join('');
+      const ingredientsList = recipe.ingredients.map(ing => `<li>${escapeHtml(ing.amount)} ${escapeHtml(ing.unit)} ${escapeHtml(ing.name)}</li>`).join('');
+      const instructionsList = recipe.instructions.map(step => `<li>${escapeHtml(step)}</li>`).join('');
 
       html += `
-      <div class="recipe-card approved-card" id="recipe-${idx}" onclick="toggleRecipeSelection(${idx}, '${escapeJSString(recipe.name)}')">
+      <div class="recipe-card approved-card" id="recipe-${idx}" onclick="handleCardClick(event, ${idx})">
         <div class="recipe-card-header">
-          <div class="recipe-title">${recipe.name}</div>
-          <div class="recipe-checkbox" id="check-${idx}"></div>
+          <div class="recipe-title-group">
+            <div class="recipe-title">${escapeHtml(recipe.name)}</div>
+            <div class="total-time-badge">${totalTimeBadge}</div>
+          </div>
+          <div class="recipe-checkbox-hitbox" title="Toggle plan inclusion" onclick="toggleRecipeSelection(event, ${idx}, '${escapeJSString(recipe.name)}')">
+            <div class="recipe-checkbox" id="check-${idx}"></div>
+          </div>
         </div>
         
-        <div class="recipe-desc">${recipe.description}</div>
-        
-        <div class="recipe-date-container" onclick="event.stopPropagation()">
-          <span class="recipe-date-label">Schedule Prep:</span>
-          ${plan.approved
-          ? `<span style="font-size: 13px; font-weight:600; color:var(--accent-secondary);">${defaultDate}</span>`
-          : `<input type="date" class="recipe-date-input" id="date-${idx}" value="${defaultDate}">`
-        }
+        <div class="recipe-desc mobile-teaser">${escapeHtml(recipe.description)}</div>
+
+        <div class="card-expand-indicator">
+          <span>Details & Schedule</span>
+          <i class="chevron">▼</i>
         </div>
         
-        <div class="recipe-meta-row">
-          <div class="recipe-meta-item">⏱️ Prep: ${recipe.prepTime}</div>
-          <div class="recipe-meta-item">🔥 Cook: ${recipe.cookTime}</div>
-        </div>
-        
-        <div class="recipe-accordion" onclick="event.stopPropagation()">
-          <button class="recipe-accordion-btn" onclick="toggleDetails(${idx})">
-            <span>📋 View Details</span>
-          </button>
+        <div class="recipe-card-collapsible">
+          <div class="recipe-date-container" onclick="event.stopPropagation()">
+            <span class="recipe-date-label">Schedule Prep:</span>
+            ${plan.approved
+            ? `<span style="font-size: 13px; font-weight:600; color:var(--accent-secondary);">${defaultDate}</span>`
+            : `<input type="date" class="recipe-date-input" id="date-${idx}" value="${defaultDate}">`
+          }
+          </div>
           
-          <div class="recipe-details" id="details-${idx}">
-            <div class="detail-section">
-              <div class="detail-heading">Ingredients</div>
-              <ul class="detail-list">
-                ${ingredientsList}
-              </ul>
-            </div>
-            <div class="detail-section">
-              <div class="detail-heading">Instructions</div>
-              <ul class="detail-list">
-                ${instructionsList}
-              </ul>
+          <div class="recipe-meta-row">
+            <div class="recipe-meta-item">⏱️ Prep: ${escapeHtml(recipe.prepTime)}</div>
+            <div class="recipe-meta-item">🔥 Cook: ${escapeHtml(recipe.cookTime)}</div>
+          </div>
+          
+          <div class="recipe-accordion" onclick="event.stopPropagation()">
+            <button type="button" class="recipe-accordion-btn" onclick="toggleDetails(${idx})">
+              <span>📋 View Ingredients & Steps</span>
+            </button>
+            
+            <div class="recipe-details" id="details-${idx}">
+              <div class="detail-section">
+                <div class="detail-heading">Ingredients</div>
+                <ul class="detail-list">
+                  ${ingredientsList}
+                </ul>
+              </div>
+              <div class="detail-section">
+                <div class="detail-heading">Instructions</div>
+                <ul class="detail-list">
+                  ${instructionsList}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -540,20 +618,35 @@
   }
 
   /**
-   * Handle individual card toggles
+   * Handle card expansion on click/tap
    */
-  function toggleRecipeSelection(idx, recipeName) {
+  function handleCardClick(event, idx) {
+    const card = document.getElementById(`recipe-${idx}`);
+    if (!card) return;
+    card.classList.toggle('expanded');
+  }
+
+  /**
+   * Handle individual card selection toggles
+   */
+  function toggleRecipeSelection(event, idx, recipeName) {
+    if (event) {
+      event.stopPropagation();
+    }
     const plan = appState.db.mealPlan;
     if (plan && plan.approved) return; // Disallow toggle if already approved
 
     const card = document.getElementById(`recipe-${idx}`);
+    if (!card) return;
 
     if (appState.selectedRecipes.has(recipeName)) {
       appState.selectedRecipes.delete(recipeName);
-      card.className = "recipe-card deselected-card";
+      card.classList.remove('approved-card');
+      card.classList.add('deselected-card');
     } else {
       appState.selectedRecipes.add(recipeName);
-      card.className = "recipe-card approved-card";
+      card.classList.remove('deselected-card');
+      card.classList.add('approved-card');
     }
   }
 
@@ -566,10 +659,10 @@
 
     if (details.classList.contains('open')) {
       details.classList.remove('open');
-      btn.innerHTML = "<span>📋 View Details</span>";
+      btn.innerHTML = "<span>📋 View Ingredients & Steps</span>";
     } else {
       details.classList.add('open');
-      btn.innerHTML = "<span>❌ Hide Details</span>";
+      btn.innerHTML = "<span>❌ Hide Ingredients & Steps</span>";
     }
   }
 
@@ -654,13 +747,6 @@
     toastTimeout = setTimeout(() => {
       els.toast.classList.remove('show');
     }, 4000);
-  }
-
-  /**
-   * Escapes single quotes for JS strings
-   */
-  function escapeJSString(str) {
-    return str.replace(/'/g, "\\'");
   }
 
   /**

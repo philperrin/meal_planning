@@ -3,6 +3,7 @@
 
 <head>
   <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <!-- Include Premium CSS Stylesheet -->
   <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
 </head>
@@ -16,7 +17,7 @@
         <span class="brand-icon">🍽️</span>
         <h1>Meal Planning Assistant</h1>
       </div>
-      <nav>
+      <nav class="nav-desktop">
         <button class="nav-tab active" data-view="planner">🗓️ Planner</button>
         <button class="nav-tab" data-view="history">📜 History</button>
         <button class="nav-tab" data-view="preferences">❤️ Preferences</button>
@@ -193,6 +194,26 @@
       </div>
 
     </main>
+
+    <!-- STICKY BOTTOM NAVIGATION (MOBILE) -->
+    <nav class="bottom-nav" id="bottom-nav" aria-label="Mobile Navigation">
+      <button class="nav-tab active" data-view="planner">
+        <span class="nav-tab-icon">🗓️</span>
+        <span class="nav-tab-label">Planner</span>
+      </button>
+      <button class="nav-tab" data-view="history">
+        <span class="nav-tab-icon">📜</span>
+        <span class="nav-tab-label">History</span>
+      </button>
+      <button class="nav-tab" data-view="preferences">
+        <span class="nav-tab-icon">❤️</span>
+        <span class="nav-tab-label">Preferences</span>
+      </button>
+      <button class="nav-tab" data-view="settings">
+        <span class="nav-tab-icon">⚙️</span>
+        <span class="nav-tab-label">Settings</span>
+      </button>
+    </nav>
 
     <!-- TOAST NOTIFICATION -->
     <div class="toast" id="toast">

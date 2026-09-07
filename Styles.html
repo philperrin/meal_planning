@@ -436,20 +436,59 @@
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 12px;
+    gap: 10px;
+  }
+
+  .recipe-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-grow: 1;
+    min-width: 0;
   }
 
   .recipe-title {
     font-size: 18px;
     font-weight: 600;
-    flex-grow: 1;
-    padding-right: 12px;
+    line-height: 1.3;
+    color: var(--text-primary);
+    word-break: break-word;
+  }
+
+  .total-time-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--accent-secondary);
+    background: rgba(166, 138, 100, 0.15);
+    border: 1px solid rgba(166, 138, 100, 0.28);
+    padding: 2px 8px;
+    border-radius: 20px;
+    width: fit-content;
+    white-space: nowrap;
+  }
+
+  /* 44x44px accessible touch target for card checkbox */
+  .recipe-checkbox-hitbox {
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin: -10px -10px -10px 0;
+    padding: 10px;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .recipe-checkbox {
     position: relative;
     width: 24px;
     height: 24px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.25);
     border-radius: 6px;
     display: flex;
     align-items: center;
@@ -482,6 +521,33 @@
     color: var(--text-secondary);
     margin-bottom: 16px;
     flex-grow: 1;
+    line-height: 1.5;
+  }
+
+  .card-expand-indicator {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--accent-primary);
+    font-weight: 600;
+    padding-top: 6px;
+    margin-top: 4px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+
+  .card-expand-indicator .chevron {
+    transition: transform 0.25s ease;
+    font-style: normal;
+    font-size: 10px;
+  }
+
+  .recipe-card.expanded .card-expand-indicator .chevron {
+    transform: rotate(180deg);
+  }
+
+  .recipe-card-collapsible {
+    display: block;
   }
 
   .recipe-meta-row {
@@ -529,10 +595,11 @@
     background: rgba(28, 30, 21, 0.6);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 6px 10px;
     color: var(--text-primary);
     font-family: var(--font-sans);
-    font-size: 12px;
+    font-size: 13px;
+    min-height: 40px;
     outline: none;
     transition: var(--transition);
     cursor: pointer;
@@ -558,7 +625,8 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 0;
+    padding: 8px 0;
+    min-height: 44px;
     transition: var(--transition);
   }
 
@@ -607,204 +675,216 @@
     left: 0;
   }
 
-  /* Success Execution Box */
-  .success-box {
-    background: rgba(101, 109, 74, 0.08);
-    border: 1px solid rgba(101, 109, 74, 0.2);
-    border-radius: var(--radius-lg);
-    padding: 32px;
-    text-align: center;
-    margin-bottom: 32px;
-    animation: scaleUp 0.4s ease-out forwards;
+  /* Sticky Bottom Navigation (Mobile Default Hidden on Desktop) */
+  .bottom-nav {
+    display: none;
   }
 
-  .success-icon {
-    font-size: 48px;
-    color: var(--accent-primary);
-    margin-bottom: 16px;
-  }
-
-  .success-title {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 8px;
-  }
-
-  .success-desc {
-    font-size: 14px;
-    color: var(--text-secondary);
-    max-width: 600px;
-    margin: 0 auto 24px;
-  }
-
-  .success-links {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-
-  .doc-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 10px 18px;
-    border-radius: var(--radius-sm);
-    color: var(--text-primary);
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 500;
-    transition: var(--transition);
-  }
-
-  .doc-link:hover {
-    background: rgba(101, 109, 74, 0.15);
-    border-color: rgba(101, 109, 74, 0.3);
-    transform: translateY(-2px);
-  }
-
-  /* Keyframe Animations */
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes spin {
-    to {
-      transform: rotate(360deg);
-    }
-  }
-
-  @keyframes pulse-slow {
-
-    0%,
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-
-    50% {
-      opacity: 0.8;
-      transform: scale(1.05);
-    }
-  }
-
-  @keyframes slideDown {
-    from {
-      opacity: 0;
-      transform: translateY(-4px);
-    }
-
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes scaleUp {
-    from {
-      opacity: 0;
-      transform: scale(0.95);
-    }
-
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
-  /* API Key Badge */
-  .api-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 30px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-  }
-
-  .api-badge.active {
-    background: rgba(101, 109, 74, 0.15);
-    color: var(--accent-primary);
-  }
-
-  .api-badge.shared {
-    background: rgba(184, 115, 51, 0.15);
-    color: var(--accent-secondary);
-  }
-
-  .api-badge.missing {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--error);
-  }
-
-  /* Toast Notifications */
-  .toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    background: var(--bg-secondary);
-    border-left: 4px solid var(--accent-primary);
-    border-radius: var(--radius-sm);
-    padding: 12px 24px;
-    color: var(--text-primary);
-    font-size: 14px;
-    font-weight: 500;
-    box-shadow: var(--shadow-lg);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    z-index: 1000;
-    transform: translateY(150%);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  }
-
-  .toast.show {
-    transform: translateY(0);
-  }
-
-  .toast.toast-error {
-    border-left-color: var(--error);
-  }
-
-  /* Responsive Overrides */
+  /* Responsive Overrides (Mobile Viewports <= 768px) */
   @media(max-width: 768px) {
-    header {
-      flex-direction: column;
-      gap: 16px;
-      align-items: stretch;
-      text-align: center;
-    }
-
-    .brand {
-      justify-content: center;
-    }
-
-    nav {
-      justify-content: center;
-    }
-
-    .recipe-grid {
-      grid-template-columns: 1fr;
+    body {
+      padding-bottom: 0;
     }
 
     .app-container {
-      padding: 12px;
+      padding: 12px 12px calc(76px + env(safe-area-inset-bottom, 0px)) 12px;
     }
 
+    header {
+      margin-bottom: 16px;
+      padding: 12px 16px;
+      flex-direction: row;
+      justify-content: flex-start;
+      align-items: center;
+    }
+
+    .brand {
+      justify-content: flex-start;
+      gap: 8px;
+    }
+
+    .brand-icon {
+      font-size: 22px;
+    }
+
+    h1 {
+      font-size: 17px;
+      letter-spacing: -0.3px;
+    }
+
+    /* Hide desktop top nav on mobile */
+    .nav-desktop {
+      display: none !important;
+    }
+
+    /* Fixed Sticky Bottom Navigation */
+    .bottom-nav {
+      display: flex;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 900;
+      background: rgba(28, 30, 21, 0.94);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-top: 1px solid var(--border-card);
+      padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)) 8px;
+      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.45);
+      justify-content: space-around;
+      align-items: center;
+    }
+
+    .bottom-nav .nav-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      min-width: 44px;
+      padding: 4px 6px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      transition: var(--transition);
+      gap: 2px;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .bottom-nav .nav-tab-icon {
+      font-size: 18px;
+      line-height: 1;
+      transition: transform 0.2s ease;
+    }
+
+    .bottom-nav .nav-tab-label {
+      font-size: 11px;
+      line-height: 1.1;
+    }
+
+    .bottom-nav .nav-tab.active {
+      color: var(--text-primary);
+      background: rgba(101, 109, 74, 0.2);
+      border-color: rgba(101, 109, 74, 0.35);
+      font-weight: 600;
+    }
+
+    .bottom-nav .nav-tab.active .nav-tab-icon {
+      transform: scale(1.15);
+    }
+
+    /* Panels & General Mobile Spacing */
     .panel {
-      padding: 20px;
+      padding: 18px 16px;
+      border-radius: var(--radius-md);
+      margin-bottom: 16px;
+    }
+
+    .panel-title {
+      font-size: 18px;
+      margin-bottom: 16px;
+    }
+
+    /* Mobile Compact Recipe Card */
+    .recipe-grid {
+      grid-template-columns: 1fr;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .recipe-card {
+      padding: 16px;
+      border-radius: var(--radius-md);
+    }
+
+    .recipe-card:hover {
+      transform: none; /* Disable hover movement on touch screens */
+    }
+
+    .recipe-title {
+      font-size: 16px;
+    }
+
+    /* 1-Line Glanceable Teaser on Mobile (when collapsed) */
+    .recipe-desc.mobile-teaser {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Tap-to-expand Indicator on Mobile */
+    .card-expand-indicator {
+      display: flex;
+    }
+
+    /* Collapsible Body on Mobile */
+    .recipe-card-collapsible {
+      display: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .recipe-card.expanded .recipe-card-collapsible {
+      display: block;
+      animation: slideDown 0.25s ease-out forwards;
+    }
+
+    .recipe-card.expanded .recipe-desc.mobile-teaser {
+      display: block;
+      -webkit-line-clamp: unset;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    /* Mobile Touch Targets (>= 44px) & Inputs */
+    .btn {
+      min-height: 48px;
+      padding: 12px 20px;
+      font-size: 15px;
+      width: 100%;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="date"],
+    textarea {
+      font-size: 16px !important; /* Prevents auto-zoom on iOS */
+      min-height: 44px;
+    }
+
+    .recipe-date-input {
+      min-height: 44px;
+      font-size: 14px !important;
+      padding: 8px 12px;
+    }
+
+    /* Mobile Cuisine Selector Pills */
+    .cuisine-card {
+      padding: 10px 12px;
+    }
+
+    .cuisine-btn {
+      min-height: 38px;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    /* Floating Toast Placement Above Bottom Nav */
+    .toast {
+      bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+      right: 12px;
+      left: 12px;
+      border-radius: var(--radius-sm);
     }
   }
 
