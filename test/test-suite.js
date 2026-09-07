@@ -433,7 +433,8 @@ describe('3. Data Processing & Helper Functions', () => {
       dietaryPreferences: "Keto",
       cuisinePreferences: { Italian: "prefer", Mexican: "avoid" },
       dinersCount: "4",
-      defaultMealTime: "07:30 PM"
+      defaultMealTime: "07:30 PM",
+      skipWelcomePage: true
     };
 
     const res = ctx.savePreferences(newPrefs);
@@ -442,11 +443,26 @@ describe('3. Data Processing & Helper Functions', () => {
     assertEqual(res.db.preferences.dietaryPreferences, "Keto");
     assertEqual(res.db.preferences.dinersCount, 4);
     assertEqual(res.db.preferences.defaultMealTime, "07:30 PM");
+    assertEqual(res.db.preferences.skipWelcomePage, true);
     assertEqual(res.db.preferences.cuisinePreferences.Italian, "prefer");
     assertEqual(res.db.preferences.cuisinePreferences.Mexican, "avoid");
   });
 
-  test('Database schema migrations migrate legacy "restrictions" to "dietaryPreferences"', () => {
+  test('setSkipWelcomePreference() directly updates skipWelcomePage flag in DB', () => {
+    const ctx = createMockGasContext();
+    const resTrue = ctx.setSkipWelcomePreference(true);
+    assertEqual(resTrue.success, true);
+    assertEqual(resTrue.skipWelcomePage, true);
+
+    const appData = ctx.loadAppData();
+    assertEqual(appData.db.preferences.skipWelcomePage, true);
+
+    const resFalse = ctx.setSkipWelcomePreference(false);
+    assertEqual(resFalse.success, true);
+    assertEqual(resFalse.skipWelcomePage, false);
+  });
+
+  test('Database schema migrations migrate legacy "restrictions" to "dietaryPreferences" and ensure skipWelcomePage', () => {
     const legacyDb = {
       preferences: {
         restrictions: "No gluten."
@@ -458,6 +474,7 @@ describe('3. Data Processing & Helper Functions', () => {
     assertEqual(data.db.preferences.restrictions, undefined);
     assertEqual(data.db.preferences.dinersCount, 2);
     assertEqual(data.db.preferences.defaultMealTime, "06:00 PM");
+    assertEqual(data.db.preferences.skipWelcomePage, false);
     assertDeepEqual(data.db.preferences.cuisinePreferences, {});
   });
 });
@@ -471,6 +488,8 @@ describe('4. Frontend DOM & Template Element Bindings', () => {
       'pref-dietary-preferences',
       'pref-diners',
       'pref-meal-time',
+      'pref-skip-welcome',
+      'skip-welcome-checkbox',
       'cuisine-grid',
       'api-key-input',
       'api-badge',
@@ -643,6 +662,29 @@ describe('6. Favicon & Welcome Page Navigation (MPA-6 & MPA-7)', () => {
     assert(indexHtml.includes("switchView('preferences')"), 'Welcome view must link to preferences view');
     assert(indexHtml.includes("switchView('planner')"), 'Welcome view must link to planner view');
     assert(indexHtml.includes("switchView('history')"), 'Welcome view must link to history view');
+  });
+});
+
+describe('7. Skip Welcome Preference & Matte Styling Experience', () => {
+  const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+  const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+  const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+
+  test('Index.html defines skip-welcome-checkbox inside welcome-hero panel', () => {
+    assert(/welcome-hero[\s\S]*?id=["']skip-welcome-checkbox["']/i.test(indexHtml),
+      'skip-welcome-checkbox must be located within the welcome-hero panel in Index.html');
+    assert(/onchange=["']handleToggleSkipWelcome\(this\.checked\)["']/i.test(indexHtml),
+      'skip-welcome-checkbox must trigger handleToggleSkipWelcome(this.checked)');
+  });
+
+  test('Styles.html eliminates all gradients and corner textures for a clean matte aesthetic', () => {
+    assert(!/gradient/i.test(stylesHtml), 'Styles.html must not contain linear-gradient or radial-gradient');
+    assert(!/\.welcome-hero::before/i.test(stylesHtml), 'welcome-hero corner texture pseudo-element must be removed');
+  });
+
+  test('JavaScript.html defines handleToggleSkipWelcome and synchronizes preference with backend and localStorage', () => {
+    assert(jsHtml.includes('function handleToggleSkipWelcome'), 'handleToggleSkipWelcome function must exist in JavaScript.html');
+    assert(jsHtml.includes('setSkipWelcomePreference'), 'JavaScript.html must call setSkipWelcomePreference on Google Apps Script');
   });
 });
 

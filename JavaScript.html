@@ -48,6 +48,8 @@
     prefDietaryPreferences: document.getElementById('pref-dietary-preferences'),
     prefDiners: document.getElementById('pref-diners'),
     prefMealTime: document.getElementById('pref-meal-time'),
+    prefSkipWelcome: document.getElementById('pref-skip-welcome'),
+    skipWelcomeCheckbox: document.getElementById('skip-welcome-checkbox'),
     cuisineGrid: document.getElementById('cuisine-grid'),
 
     // Settings Inputs
@@ -66,6 +68,11 @@
   // Initialize App
   document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
+    try {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('meal_planner_skip_welcome') === 'true') {
+        switchView('planner');
+      }
+    } catch (e) {}
     loadInitialData();
   });
 
@@ -160,6 +167,22 @@
     els.prefDietaryPreferences.value = prefs.dietaryPreferences || "";
     els.prefDiners.value = prefs.dinersCount || 2;
     els.prefMealTime.value = prefs.defaultMealTime || "06:00 PM";
+
+    // Populate and Sync Skip Welcome Checkbox
+    const shouldSkip = !!prefs.skipWelcomePage;
+    if (els.skipWelcomeCheckbox) els.skipWelcomeCheckbox.checked = shouldSkip;
+    if (els.prefSkipWelcome) els.prefSkipWelcome.checked = shouldSkip;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('meal_planner_skip_welcome', shouldSkip ? 'true' : 'false');
+      }
+    } catch (e) {}
+
+    // If skip preference is enabled and currently on welcome view, switch to planner
+    const welcomeView = document.getElementById('welcome-view');
+    if (shouldSkip && welcomeView && welcomeView.classList.contains('active')) {
+      switchView('planner');
+    }
 
     // Populate Cuisine Preferences
     appState.cuisinePreferences = Object.assign({}, prefs.cuisinePreferences || {});
@@ -345,12 +368,14 @@
    * Save Preferences to Drive
    */
   function handleSavePreferences() {
+    const skipPref = els.prefSkipWelcome ? els.prefSkipWelcome.checked : (els.skipWelcomeCheckbox ? els.skipWelcomeCheckbox.checked : false);
     const prefs = {
       allergies: els.prefAllergies.value.trim(),
       dietaryPreferences: els.prefDietaryPreferences.value.trim(),
       cuisinePreferences: appState.cuisinePreferences || {},
       dinersCount: parseInt(els.prefDiners.value, 10) || 2,
-      defaultMealTime: els.prefMealTime.value.trim()
+      defaultMealTime: els.prefMealTime.value.trim(),
+      skipWelcomePage: skipPref
     };
 
     showLoader("Saving preferences...", "Updating your database in Google Drive");
@@ -359,6 +384,14 @@
       .withSuccessHandler(data => {
         hideLoader();
         appState.db = data.db;
+        const shouldSkip = !!data.db.preferences.skipWelcomePage;
+        if (els.skipWelcomeCheckbox) els.skipWelcomeCheckbox.checked = shouldSkip;
+        if (els.prefSkipWelcome) els.prefSkipWelcome.checked = shouldSkip;
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('meal_planner_skip_welcome', shouldSkip ? 'true' : 'false');
+          }
+        } catch (e) {}
         showToast("Preferences saved successfully!");
       })
       .withFailureHandler(err => {
@@ -366,6 +399,40 @@
         showToast("Failed to save preferences: " + err.message, true);
       })
       .savePreferences(prefs);
+  }
+
+  /**
+   * Toggle skip welcome page preference from hero panel or preferences
+   */
+  function handleToggleSkipWelcome(isChecked) {
+    isChecked = !!isChecked;
+    if (els.skipWelcomeCheckbox) els.skipWelcomeCheckbox.checked = isChecked;
+    if (els.prefSkipWelcome) els.prefSkipWelcome.checked = isChecked;
+
+    if (!appState.db.preferences) appState.db.preferences = {};
+    appState.db.preferences.skipWelcomePage = isChecked;
+
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('meal_planner_skip_welcome', isChecked ? 'true' : 'false');
+      }
+    } catch (e) {}
+
+    google.script.run
+      .withSuccessHandler(res => {
+        // Preference persisted in Drive database
+      })
+      .withFailureHandler(err => {
+        showToast("Failed to save skip preference: " + err.message, true);
+      })
+      .setSkipWelcomePreference(isChecked);
+
+    if (isChecked) {
+      showToast("Preference saved: skipping welcome page.");
+      switchView('planner');
+    } else {
+      showToast("Preference saved: welcome page will be shown on startup.");
+    }
   }
 
   /**

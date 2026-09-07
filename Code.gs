@@ -32,7 +32,8 @@ function getDatabaseFile() {
         dietaryPreferences: "Strong preference for high protein and seasonal vegetables.",
         cuisinePreferences: {},
         dinersCount: 2,
-        defaultMealTime: "06:00 PM"
+        defaultMealTime: "06:00 PM",
+        skipWelcomePage: false
       },
       mealPlan: null,
       lastUpdated: new Date().toISOString()
@@ -75,6 +76,11 @@ function loadAppData() {
     // Ensure defaultMealTime exists
     if (db.preferences.defaultMealTime === undefined) {
       db.preferences.defaultMealTime = "06:00 PM";
+      updated = true;
+    }
+    // Ensure skipWelcomePage exists
+    if (db.preferences.skipWelcomePage === undefined) {
+      db.preferences.skipWelcomePage = false;
       updated = true;
     }
     
@@ -165,7 +171,8 @@ function savePreferences(preferences) {
       dietaryPreferences: preferences.dietaryPreferences || "",
       cuisinePreferences: (preferences.cuisinePreferences && typeof preferences.cuisinePreferences === 'object') ? preferences.cuisinePreferences : {},
       dinersCount: parseInt(preferences.dinersCount, 10) || 2,
-      defaultMealTime: preferences.defaultMealTime || "06:00 PM"
+      defaultMealTime: preferences.defaultMealTime || "06:00 PM",
+      skipWelcomePage: !!preferences.skipWelcomePage
     };
     db.lastUpdated = new Date().toISOString();
     
@@ -174,6 +181,26 @@ function savePreferences(preferences) {
   } catch (e) {
     Logger.log("Error saving preferences: " + e.toString());
     throw new Error("Failed to save preferences: " + e.message);
+  }
+}
+
+/**
+ * Quick updates the skip welcome page preference.
+ */
+function setSkipWelcomePreference(skip) {
+  try {
+    var file = getDatabaseFile();
+    var content = file.getBlob().getDataAsString();
+    var db = JSON.parse(content);
+    if (!db.preferences) db.preferences = {};
+    db.preferences.skipWelcomePage = !!skip;
+    db.lastUpdated = new Date().toISOString();
+    
+    file.setContent(JSON.stringify(db, null, 2));
+    return { success: true, skipWelcomePage: db.preferences.skipWelcomePage };
+  } catch (e) {
+    Logger.log("Error saving skip welcome preference: " + e.toString());
+    throw new Error("Failed to save skip welcome preference: " + e.message);
   }
 }
 
