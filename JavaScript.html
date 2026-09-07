@@ -658,6 +658,10 @@
       // Compute total time badge
       const totalTimeBadge = calculateTotalTime(recipe.prepTime, recipe.cookTime);
 
+      // Favorite status
+      const ratingInfo = (appState.historyData && appState.historyData.ratings && appState.historyData.ratings[recipe.name]) || (appState.db.recipeRatings && appState.db.recipeRatings[recipe.name]);
+      const isFav = ratingInfo ? (ratingInfo.isFavorite === true || ratingInfo.rating > 0) : false;
+
       // Build recipe details list
       const ingredientsList = recipe.ingredients.map(ing => `<li>${escapeHtml(ing.amount)} ${escapeHtml(ing.unit)} ${escapeHtml(ing.name)}</li>`).join('');
       const instructionsList = recipe.instructions.map(step => `<li>${escapeHtml(step)}</li>`).join('');
@@ -667,7 +671,20 @@
         <div class="recipe-card-header">
           <div class="recipe-title-group">
             <div class="recipe-title">${escapeHtml(recipe.name)}</div>
-            <div class="total-time-badge">${totalTimeBadge}</div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:2px;">
+              <div class="total-time-badge">${totalTimeBadge}</div>
+              <button type="button" class="favorite-btn ${isFav ? 'active' : ''}" 
+                onclick="handleToggleFavorite(event, '${escapeJSString(recipe.name)}', ${escapeJSString(JSON.stringify(recipe))})"
+                title="${isFav ? 'Family Favorite' : 'Star / Bookmark Recipe'}">
+                <span class="star-icon">${isFav ? '★' : '☆'}</span>
+                <span>${isFav ? 'Favorite' : 'Star'}</span>
+              </button>
+              ${!plan.approved ? `
+                <button type="button" class="btn-card-remove" onclick="handleRemoveRecipeFromPlan(event, ${idx})" title="Remove from this week's plan">
+                  <span>✕ Remove</span>
+                </button>
+              ` : ''}
+            </div>
           </div>
           <div class="recipe-checkbox-hitbox" title="Toggle plan inclusion" onclick="toggleRecipeSelection(event, ${idx}, '${escapeJSString(recipe.name)}')">
             <div class="recipe-checkbox" id="check-${idx}"></div>
@@ -732,6 +749,25 @@
     }
 
     els.plannerContainer.innerHTML = html;
+  }
+
+  /**
+   * Handle removing an individual recipe from unapproved active meal plan
+   */
+  function handleRemoveRecipeFromPlan(event, idx) {
+    if (event) event.stopPropagation();
+    if (!appState.db.mealPlan || !appState.db.mealPlan.recipes) return;
+    
+    const removedRecipe = appState.db.mealPlan.recipes[idx];
+    appState.db.mealPlan.recipes.splice(idx, 1);
+    
+    renderMealPlan();
+    showToast(removedRecipe ? `Removed "${removedRecipe.name}" from plan.` : "Removed meal from plan.");
+    
+    // Persist updated plan to server
+    google.script.run
+      .withFailureHandler(err => console.error("Failed to sync plan update: " + err.message))
+      .saveActiveMealPlanServer(appState.db.mealPlan.recipes);
   }
 
   /**
@@ -952,46 +988,46 @@
   }
 
   /**
-   * Render Star Rating widget (0-5 stars)
+   * Handle single-star favorite toggle on a recipe
    */
-  function renderStarRating(recipeName, rating = 0) {
-    let starsHtml = `<div class="star-rating" title="Rating: ${rating} / 5 stars">`;
-    for (let star = 1; star <= 5; star++) {
-      const isFilled = star <= rating;
-      starsHtml += `
-        <button type="button" class="star-btn ${isFilled ? 'filled' : ''}" 
-          onclick="handleSetRating(event, '${escapeJSString(recipeName)}', ${star})"
-          aria-label="Rate ${star} star${star > 1 ? 's' : ''}">
-          ${isFilled ? '★' : '☆'}
-        </button>
-      `;
-    }
-    starsHtml += `<span class="star-rating-score">${rating > 0 ? rating + '★' : '0★'}</span>`;
-    starsHtml += `</div>`;
-    return starsHtml;
-  }
-
-  /**
-   * Handle user rating click on a recipe
-   */
-  function handleSetRating(event, recipeName, selectedScore) {
+  function handleToggleFavorite(event, recipeName, recipeObj) {
     if (event) event.stopPropagation();
     
-    const currentRating = (appState.historyData.ratings[recipeName] && appState.historyData.ratings[recipeName].rating) || 0;
-    const newRating = (currentRating === selectedScore) ? 0 : selectedScore;
+    // Determine current favorite status
+    const currentInfo = (appState.historyData.ratings && appState.historyData.ratings[recipeName]) || (appState.db.recipeRatings && appState.db.recipeRatings[recipeName]);
+    const currentlyFav = currentInfo ? (currentInfo.isFavorite === true || currentInfo.rating > 0) : false;
+    const newIsFav = !currentlyFav;
     
     // Optimistically update local state
-    appState.historyData.ratings[recipeName] = { rating: newRating, ratedAt: new Date().toISOString() };
+    if (!appState.historyData.ratings) appState.historyData.ratings = {};
+    appState.historyData.ratings[recipeName] = {
+      isFavorite: newIsFav,
+      rating: newIsFav ? 5 : 0,
+      favoritedAt: new Date().toISOString()
+    };
+    if (!appState.db.recipeRatings) appState.db.recipeRatings = {};
+    appState.db.recipeRatings[recipeName] = appState.historyData.ratings[recipeName];
     
-    // Update rating on items in history array
+    // Cache recipe into library if object passed
+    if (recipeObj && typeof recipeObj === 'object') {
+      if (!appState.db.recipeLibrary) appState.db.recipeLibrary = {};
+      if (!appState.historyData.library) appState.historyData.library = {};
+      appState.db.recipeLibrary[recipeName] = recipeObj;
+      appState.historyData.library[recipeName] = recipeObj;
+    }
+    
+    // Update items in history array
     appState.historyData.history.forEach(item => {
-      if (item.name === recipeName) item.rating = newRating;
+      if (item.name === recipeName) {
+        item.isFavorite = newIsFav;
+        item.rating = newIsFav ? 5 : 0;
+      }
     });
     
-    // Update or re-filter favorites array
+    // Re-filter favorites array
     const favSet = new Map();
     appState.historyData.history.forEach(item => {
-      if (item.rating > 0) favSet.set(item.name, item);
+      if (item.isFavorite === true || item.rating > 0) favSet.set(item.name, item);
     });
     appState.historyData.favorites = Array.from(favSet.values()).sort((a, b) => {
       if (b.rating !== a.rating) return b.rating - a.rating;
@@ -1003,25 +1039,131 @@
     if (els.badgeRecentCount) els.badgeRecentCount.textContent = appState.historyData.history.length;
     if (els.badgeFavoritesCount) els.badgeFavoritesCount.textContent = appState.historyData.favorites.length;
     
-    renderHistoryList();
-    
-    if (newRating > 0) {
-      showToast(`Rated "${recipeName}" ${newRating} star${newRating > 1 ? 's' : ''}!`);
-    } else {
-      showToast(`Cleared rating for "${recipeName}".`);
+    // Re-render views as needed
+    if (els.historyContainer && appState.currentView === 'history') {
+      renderHistoryList();
+    }
+    if (appState.currentView === 'planner') {
+      renderMealPlan();
     }
     
-    // Call server to persist rating in Drive DB
+    if (newIsFav) {
+      showToast(`⭐ Added "${recipeName}" to Family Favorites!`);
+    } else {
+      showToast(`Removed "${recipeName}" from Family Favorites.`);
+    }
+    
+    // Call server to persist favorite status in Drive DB
     google.script.run
       .withSuccessHandler(res => {
         if (res && res.recipeRatings) {
           appState.historyData.ratings = res.recipeRatings;
+          appState.db.recipeRatings = res.recipeRatings;
+        }
+        if (res && res.recipeLibrary) {
+          appState.historyData.library = res.recipeLibrary;
+          appState.db.recipeLibrary = res.recipeLibrary;
         }
       })
       .withFailureHandler(err => {
-        showToast("Failed to save rating: " + err.message, true);
+        showToast("Failed to save favorite: " + err.message, true);
       })
-      .setRecipeRating(recipeName, newRating);
+      .toggleFavoriteRecipeServer(recipeName, newIsFav, recipeObj);
+  }
+
+  /**
+   * Helper function to render a single-star favorite button (backward-compatible alias)
+   */
+  function renderStarRating(recipeName, rating = 0) {
+    const isFav = rating > 0;
+    return `
+      <button type="button" class="favorite-btn ${isFav ? 'active' : ''}" 
+        onclick="handleToggleFavorite(event, '${escapeJSString(recipeName)}')"
+        title="${isFav ? 'Remove from Family Favorites' : 'Add to Family Favorites'}">
+        <span class="star-icon">${isFav ? '★' : '☆'}</span>
+        <span>${isFav ? 'Favorite' : 'Star'}</span>
+      </button>
+    `;
+  }
+
+  /**
+   * Backward-compatible rating setter
+   */
+  function handleSetRating(event, recipeName, selectedScore) {
+    handleToggleFavorite(event, recipeName);
+  }
+
+  /**
+   * 1-Click Insert a favorite/history recipe into the active meal plan grid
+   */
+  function handleQuickAddToPlan(event, recipeName) {
+    if (event) event.stopPropagation();
+    
+    // Retrieve recipe definition from library or history
+    const library = (appState.historyData && appState.historyData.library) || (appState.db && appState.db.recipeLibrary) || {};
+    let recipe = library[recipeName];
+    
+    if (!recipe) {
+      // Fallback recipe object
+      recipe = {
+        name: recipeName,
+        description: "Classic home favorite from your recipe history.",
+        prepTime: "20 mins",
+        cookTime: "30 mins",
+        ingredients: [
+          { name: "main ingredients (see doc)", amount: 1, unit: "recipe" }
+        ],
+        instructions: [
+          "Follow instructions in the linked Google Doc."
+        ],
+        originalDiners: parseInt(appState.db.preferences.dinersCount, 10) || 2,
+        isReused: true
+      };
+    }
+    
+    // Deep clone so diner scaling doesn't mutate cached original
+    const clonedRecipe = JSON.parse(JSON.stringify(recipe));
+    clonedRecipe.isReused = true;
+    
+    // Scale ingredients to current household diners
+    const origDiners = parseInt(clonedRecipe.originalDiners, 10) || parseInt(appState.db.preferences.dinersCount, 10) || 2;
+    const currDiners = parseInt(appState.db.preferences.dinersCount, 10) || 2;
+    if (origDiners !== currDiners && Array.isArray(clonedRecipe.ingredients)) {
+      clonedRecipe.ingredients.forEach(ing => {
+        if (typeof ing.amount === 'number') {
+          ing.amount = Math.round((ing.amount * currDiners / origDiners) * 100) / 100;
+        }
+      });
+      clonedRecipe.originalDiners = currDiners;
+    }
+    
+    // Initialize or modify meal plan
+    if (!appState.db.mealPlan || appState.db.mealPlan.approved) {
+      appState.db.mealPlan = {
+        generatedAt: new Date().toISOString(),
+        approved: false,
+        recipes: []
+      };
+    }
+    
+    // Check if recipe already in active plan
+    const alreadyExists = appState.db.mealPlan.recipes.some(r => r.name.toLowerCase() === recipeName.toLowerCase());
+    if (alreadyExists) {
+      showToast(`"${recipeName}" is already in your active weekly plan.`);
+      switchView('planner');
+      return;
+    }
+    
+    appState.db.mealPlan.recipes.push(clonedRecipe);
+    renderMealPlan();
+    
+    showToast(`✨ Added "${recipeName}" to this week's plan!`);
+    switchView('planner');
+    
+    // Persist updated plan to server
+    google.script.run
+      .withFailureHandler(err => console.error("Failed to sync plan update: " + err.message))
+      .saveActiveMealPlanServer(appState.db.mealPlan.recipes);
   }
 
   /**
@@ -1052,13 +1194,20 @@
    */
   function onHistoryLoaded(data) {
     if (Array.isArray(data)) {
-      appState.historyData = { history: data, favorites: [], ratings: {} };
+      appState.historyData = { history: data, favorites: [], ratings: {}, library: {} };
     } else if (data) {
       appState.historyData = {
         history: data.history || [],
         favorites: data.favorites || [],
-        ratings: data.ratings || {}
+        ratings: data.ratings || {},
+        library: data.library || {}
       };
+      if (data.library) {
+        appState.db.recipeLibrary = Object.assign({}, appState.db.recipeLibrary, data.library);
+      }
+      if (data.ratings) {
+        appState.db.recipeRatings = Object.assign({}, appState.db.recipeRatings, data.ratings);
+      }
     }
     
     // Update subtab badges
@@ -1089,8 +1238,8 @@
         els.historyContainer.innerHTML = `
           <div class="empty-state" style="border-style: solid; padding: 32px 16px;">
             <div class="empty-state-icon" style="font-size:32px;">⭐</div>
-            <h3>No Rated Favorites Yet</h3>
-            <p>Click on the star ratings (1–5 stars) on any recipe in your <strong>Recipe History</strong> to add them to your favorites!</p>
+            <h3>No Family Favorites Yet</h3>
+            <p>Click the <strong>⭐ Star</strong> button on any recipe card in your Planner or Recipe History to save your staples here!</p>
           </div>
         `;
       }
@@ -1101,14 +1250,13 @@
 
     items.forEach(item => {
       const isReused = appState.reusedRecipes.has(item.name);
-      const rating = (appState.historyData.ratings[item.name] && typeof appState.historyData.ratings[item.name].rating === 'number')
-        ? appState.historyData.ratings[item.name].rating
-        : (item.rating || 0);
+      const ratingInfo = (appState.historyData.ratings && appState.historyData.ratings[item.name]) || (appState.db.recipeRatings && appState.db.recipeRatings[item.name]);
+      const isFav = ratingInfo ? (ratingInfo.isFavorite === true || ratingInfo.rating > 0) : (item.isFavorite || item.rating > 0);
 
       html += `
         <div class="history-item ${isReused ? 'staged-for-reuse' : ''}">
           <div class="history-item-left">
-            <label class="history-checkbox-wrap" title="Select to re-use in next meal plan">
+            <label class="history-checkbox-wrap" title="Select to re-use in next batch generation">
               <input type="checkbox" class="history-checkbox" 
                 ${isReused ? 'checked' : ''} 
                 onchange="toggleReuseRecipe('${escapeJSString(item.name)}')">
@@ -1117,7 +1265,17 @@
             <span class="history-item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
           </div>
           <div class="history-item-right">
-            ${renderStarRating(item.name, rating)}
+            <button type="button" class="favorite-btn ${isFav ? 'active' : ''}" 
+              onclick="handleToggleFavorite(event, '${escapeJSString(item.name)}')"
+              title="${isFav ? 'Remove from Family Favorites' : 'Add to Family Favorites'}">
+              <span class="star-icon">${isFav ? '★' : '☆'}</span>
+              <span>${isFav ? 'Favorite' : 'Star'}</span>
+            </button>
+            <button type="button" class="btn-quick-add" 
+              onclick="handleQuickAddToPlan(event, '${escapeJSString(item.name)}')"
+              title="Insert recipe into active weekly meal plan">
+              <span>➕ Add to Plan</span>
+            </button>
             <a href="${escapeHtml(item.url)}" target="_blank" class="doc-link">
               Open Recipe
             </a>

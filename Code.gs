@@ -260,12 +260,68 @@ function deleteApiKey() {
 }
 
 /**
- * Sets the 0-5 star rating for a recipe in the database.
+ * Toggles the single-star favorite (bookmark) status for a recipe in the database.
+ * Also caches structured recipe details in db.recipeLibrary if recipeObj is passed.
+ */
+function toggleFavoriteRecipeServer(recipeName, isFavorite, recipeObj) {
+  try {
+    if (!recipeName) throw new Error("Recipe name is required.");
+    isFavorite = !!isFavorite;
+    
+    var file = getDatabaseFile();
+    var db = JSON.parse(file.getBlob().getDataAsString());
+    if (!db.recipeRatings) {
+      db.recipeRatings = {};
+    }
+    if (!db.recipeLibrary) {
+      db.recipeLibrary = {};
+    }
+    
+    db.recipeRatings[recipeName] = {
+      isFavorite: isFavorite,
+      rating: isFavorite ? 5 : 0,
+      favoritedAt: new Date().toISOString()
+    };
+    
+    if (recipeObj && typeof recipeObj === 'object') {
+      db.recipeLibrary[recipeName] = {
+        name: recipeObj.name || recipeName,
+        description: recipeObj.description || "",
+        prepTime: recipeObj.prepTime || "20 mins",
+        cookTime: recipeObj.cookTime || "30 mins",
+        ingredients: recipeObj.ingredients || [],
+        instructions: recipeObj.instructions || [],
+        docUrl: recipeObj.docUrl || "",
+        docId: recipeObj.docId || "",
+        originalDiners: parseInt(recipeObj.originalDiners, 10) || parseInt(db.preferences.dinersCount, 10) || 2,
+        dateAdded: new Date().toISOString()
+      };
+    }
+    
+    db.lastUpdated = new Date().toISOString();
+    file.setContent(JSON.stringify(db, null, 2));
+    
+    return {
+      success: true,
+      isFavorite: isFavorite,
+      rating: isFavorite ? 5 : 0,
+      recipeRatings: db.recipeRatings,
+      recipeLibrary: db.recipeLibrary
+    };
+  } catch (e) {
+    Logger.log("Error toggling recipe favorite: " + e.toString());
+    throw new Error("Failed to update favorite status: " + e.message);
+  }
+}
+
+/**
+ * Sets the star rating for a recipe in the database (backward compatible).
  */
 function setRecipeRating(recipeName, rating) {
   try {
     if (!recipeName) throw new Error("Recipe name is required.");
     rating = Math.max(0, Math.min(5, parseInt(rating, 10) || 0));
+    var isFavorite = rating > 0;
     
     var file = getDatabaseFile();
     var db = JSON.parse(file.getBlob().getDataAsString());
@@ -274,16 +330,48 @@ function setRecipeRating(recipeName, rating) {
     }
     
     db.recipeRatings[recipeName] = {
+      isFavorite: isFavorite,
       rating: rating,
-      ratedAt: new Date().toISOString()
+      ratedAt: new Date().toISOString(),
+      favoritedAt: isFavorite ? new Date().toISOString() : null
     };
     db.lastUpdated = new Date().toISOString();
     file.setContent(JSON.stringify(db, null, 2));
     
-    return { success: true, rating: rating, recipeRatings: db.recipeRatings };
+    return { success: true, rating: rating, isFavorite: isFavorite, recipeRatings: db.recipeRatings };
   } catch (e) {
     Logger.log("Error setting recipe rating: " + e.toString());
     throw new Error("Failed to set recipe rating: " + e.message);
+  }
+}
+
+/**
+ * Saves the active meal plan recipes array when updated on the client (e.g. adding or removing recipes).
+ */
+function saveActiveMealPlanServer(recipesList) {
+  try {
+    if (!Array.isArray(recipesList)) {
+      throw new Error("Invalid recipes list.");
+    }
+    var file = getDatabaseFile();
+    var db = JSON.parse(file.getBlob().getDataAsString());
+    
+    if (!db.mealPlan) {
+      db.mealPlan = {
+        generatedAt: new Date().toISOString(),
+        approved: false,
+        recipes: []
+      };
+    }
+    
+    db.mealPlan.recipes = recipesList;
+    db.lastUpdated = new Date().toISOString();
+    file.setContent(JSON.stringify(db, null, 2));
+    
+    return { success: true, db: db };
+  } catch (e) {
+    Logger.log("Error saving active meal plan: " + e.toString());
+    throw new Error("Failed to save active meal plan: " + e.message);
   }
 }
 
@@ -907,9 +995,9 @@ function getRecipeHistory() {
           parseInt(rawDate.substring(6, 8), 10)
         ).getTime();
         
-        var recipeRating = (ratingsMap[recipeName] && typeof ratingsMap[recipeName].rating === 'number')
-          ? ratingsMap[recipeName].rating
-          : 0;
+        var ratingInfo = ratingsMap[recipeName];
+        var isFav = (ratingInfo && (ratingInfo.isFavorite === true || ratingInfo.rating > 0)) ? true : false;
+        var recipeRating = isFav ? 5 : (ratingInfo && typeof ratingInfo.rating === 'number' ? ratingInfo.rating : 0);
           
         allRecipes.push({
           name: recipeName,
@@ -917,6 +1005,7 @@ function getRecipeHistory() {
           rawDate: rawDate,
           url: f.getUrl(),
           fileId: f.getId(),
+          isFavorite: isFav,
           rating: recipeRating,
           createdTime: f.getDateCreated().getTime(),
           scheduledTime: scheduledTimestamp
@@ -932,9 +1021,9 @@ function getRecipeHistory() {
       return b.createdTime - a.createdTime;
     });
     
-    // Sort for Past Favorites: Filter recipes with rating > 0, sort by rating descending, then scheduled date descending
+    // Sort for Past Favorites: Filter recipes with isFavorite === true (or rating > 0)
     var favoritesList = allRecipes.filter(function(item) {
-      return item.rating > 0;
+      return item.isFavorite === true || item.rating > 0;
     }).sort(function(a, b) {
       if (b.rating !== a.rating) {
         return b.rating - a.rating;
@@ -948,7 +1037,8 @@ function getRecipeHistory() {
     return {
       history: historyList.slice(0, 25),
       favorites: favoritesList.slice(0, 25),
-      ratings: ratingsMap
+      ratings: ratingsMap,
+      library: db.recipeLibrary || {}
     };
   } catch (e) {
     Logger.log("Error loading recipe history: " + e.toString());

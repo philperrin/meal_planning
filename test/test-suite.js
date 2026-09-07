@@ -655,9 +655,9 @@ describe('7. Meal Planning Preferences & Helper Logic', () => {
   });
 });
 
-// 8. Recipe Rating & History Management (MPA-8)
-describe('8. Recipe Rating & History Management (MPA-8)', () => {
-  test('Backend persists star ratings (with 0-5 clamping) and sorts history/favorites accurately', () => {
+// 8. Recipe Rating & History Management (MPA-8 & MPA-15)
+describe('8. Recipe Favorites & History Management (MPA-8 & MPA-15)', () => {
+  test('Backend toggles binary favorites, caches recipe library, and sorts history/favorites accurately', () => {
     const mockFiles = [
       { name: "20260901 - Old Salmon", id: "salmon-doc", createdTime: 1000 },
       { name: "20260908 - Fresh Tacos", id: "tacos-doc", createdTime: 2000 },
@@ -668,9 +668,9 @@ describe('8. Recipe Rating & History Management (MPA-8)', () => {
       preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
       mealPlan: null,
       recipeRatings: {
-        "Old Salmon": { rating: 5 },
-        "Mid Chicken": { rating: 4 },
-        "Fresh Tacos": { rating: 0 }
+        "Old Salmon": { isFavorite: true, rating: 5 },
+        "Mid Chicken": { isFavorite: true, rating: 4 },
+        "Fresh Tacos": { isFavorite: false, rating: 0 }
       },
       recipeLibrary: {},
       lastUpdated: new Date().toISOString()
@@ -678,27 +678,49 @@ describe('8. Recipe Rating & History Management (MPA-8)', () => {
 
     const context = createMockGasContext(initialDb, {}, {}, mockFiles);
 
-    // 1. Rating persistence and clamping
-    const res = context.setRecipeRating('Lemon Salmon', 5);
-    assertEqual(res.success, true);
-    assertEqual(res.rating, 5);
-    assertEqual(context.getMockDbState().recipeRatings['Lemon Salmon'].rating, 5);
+    // 1. Binary favorite toggling & library caching via toggleFavoriteRecipeServer()
+    const favRecipeObj = {
+      name: "Sheet Pan Lemon Herb Salmon",
+      description: "Crispy herb salmon with asparagus",
+      prepTime: "15 mins",
+      cookTime: "20 mins",
+      ingredients: [{ name: "salmon", amount: 2, unit: "pieces" }],
+      instructions: ["Bake at 400F."],
+      originalDiners: 2
+    };
 
-    assertEqual(context.setRecipeRating('Tacos', 10).rating, 5, 'Rating > 5 should clamp to 5');
-    assertEqual(context.setRecipeRating('Tacos', -2).rating, 0, 'Rating < 0 should clamp to 0');
+    const resFav = context.toggleFavoriteRecipeServer('Sheet Pan Lemon Herb Salmon', true, favRecipeObj);
+    assertEqual(resFav.success, true);
+    assertEqual(resFav.isFavorite, true);
+    assertEqual(resFav.rating, 5);
+    assertEqual(context.getMockDbState().recipeRatings['Sheet Pan Lemon Herb Salmon'].isFavorite, true);
+    assertEqual(context.getMockDbState().recipeLibrary['Sheet Pan Lemon Herb Salmon'].prepTime, "15 mins");
 
-    // 2. getRecipeHistory() sorting and favorite filtering
+    // 2. Unfavoriting
+    const resUnfav = context.toggleFavoriteRecipeServer('Sheet Pan Lemon Herb Salmon', false);
+    assertEqual(resUnfav.success, true);
+    assertEqual(resUnfav.isFavorite, false);
+    assertEqual(context.getMockDbState().recipeRatings['Sheet Pan Lemon Herb Salmon'].isFavorite, false);
+
+    // 3. Backward compatible setRecipeRating()
+    const resRating = context.setRecipeRating('Old Salmon', 5);
+    assertEqual(resRating.success, true);
+    assertEqual(resRating.isFavorite, true);
+    assertEqual(resRating.rating, 5);
+
+    // 4. getRecipeHistory() sorting and favorite filtering
     const result = context.getRecipeHistory();
     assertEqual(result.history.length, 3, 'History should contain all 3 recipes');
     assertEqual(result.history[0].name, 'Fresh Tacos', 'Most recent scheduled date (2026-09-08) should be first');
     assertEqual(result.history[1].name, 'Mid Chicken', 'Second scheduled date (2026-09-05) should be second');
     assertEqual(result.history[2].name, 'Old Salmon', 'Third scheduled date (2026-09-01) should be third');
 
-    assertEqual(result.favorites.length, 2, 'Favorites should only contain recipes with rating > 0');
-    assertEqual(result.favorites[0].name, 'Old Salmon', '5-star recipe should be top favorite');
-    assertEqual(result.favorites[0].rating, 5);
-    assertEqual(result.favorites[1].name, 'Mid Chicken', '4-star recipe should be second favorite');
-    assertEqual(result.favorites[1].rating, 4);
+    assertEqual(result.favorites.length, 2, 'Favorites should only contain starred recipes');
+    assertEqual(result.favorites[0].name, 'Mid Chicken', 'More recent scheduled favorite (2026-09-05) should be first');
+    assertEqual(result.favorites[0].isFavorite, true);
+    assertEqual(result.favorites[1].name, 'Old Salmon', 'Older scheduled favorite (2026-09-01) should be second');
+    assertEqual(result.favorites[1].isFavorite, true);
+    assert(result.library !== undefined, 'Library object should be returned');
   });
 });
 
@@ -785,6 +807,45 @@ describe('10. Meal Plan Approval & Document Lifecycle (MPA-8)', () => {
     const db = context.getMockDbState();
     assertEqual(db.recipeLibrary["Classic Salmon"].lastScheduledDate, "2026-09-14", 'lastScheduledDate must be saved in recipeLibrary');
     assertEqual(db.mealPlan.approved, true, 'Plan approved status must be true');
+  });
+});
+
+// 11. Family Favorites 1-Click Plan Insertion & Live Plan Editing (MPA-15)
+describe('11. Family Favorites 1-Click Plan Insertion & Live Plan Editing (MPA-15)', () => {
+  test('saveActiveMealPlanServer() saves custom recipe additions and removals', () => {
+    const initialDb = {
+      preferences: { dinersCount: 4, defaultMealTime: "06:00 PM" },
+      mealPlan: {
+        recipes: [
+          { name: "Dish 1", prepTime: "10m", cookTime: "20m", ingredients: [], instructions: [] }
+        ],
+        approved: false,
+        generatedAt: new Date().toISOString()
+      },
+      recipeRatings: {},
+      recipeLibrary: {},
+      lastUpdated: new Date().toISOString()
+    };
+
+    const context = createMockGasContext(initialDb);
+
+    // 1. Appending a recipe
+    const updatedRecipes = [
+      ...initialDb.mealPlan.recipes,
+      { name: "Favorite Pasta", prepTime: "15m", cookTime: "20m", ingredients: [{ name: "pasta", amount: 2, unit: "boxes" }], instructions: [] }
+    ];
+
+    const saveRes = context.saveActiveMealPlanServer(updatedRecipes);
+    assertEqual(saveRes.success, true);
+    assertEqual(saveRes.db.mealPlan.recipes.length, 2);
+    assertEqual(saveRes.db.mealPlan.recipes[1].name, "Favorite Pasta");
+
+    // 2. Removing a recipe
+    const reducedRecipes = [updatedRecipes[1]];
+    const removeRes = context.saveActiveMealPlanServer(reducedRecipes);
+    assertEqual(removeRes.success, true);
+    assertEqual(removeRes.db.mealPlan.recipes.length, 1);
+    assertEqual(removeRes.db.mealPlan.recipes[0].name, "Favorite Pasta");
   });
 });
 

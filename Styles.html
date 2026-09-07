@@ -1607,46 +1607,107 @@
   }
 
   /* 0-5 Star Rating Component */
-  .star-rating {
+  /* Single Star Favorite & Quick Action Component */
+  .star-rating,
+  .favorite-btn {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    padding: 5px 9px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 2px;
+    gap: 5px;
+    transition: var(--transition);
     user-select: none;
   }
 
   .star-btn {
     background: none;
     border: none;
-    padding: 3px;
-    font-size: 16px;
-    line-height: 1;
-    color: rgba(255, 255, 255, 0.2);
     cursor: pointer;
-    transition: color 0.15s ease, transform 0.1s ease;
-    border-radius: 2px;
+    color: inherit;
+    padding: 0;
   }
 
-  .star-btn:hover {
-    transform: scale(1.2);
+  .favorite-btn:hover,
+  .star-rating:hover {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.3);
     color: #fbbf24;
+    transform: translateY(-1px);
   }
 
-  .star-btn.filled {
+  .favorite-btn.active,
+  .star-rating.active {
+    background: rgba(251, 191, 36, 0.15);
+    border-color: rgba(251, 191, 36, 0.5);
     color: #fbbf24;
-  }
-
-  .star-rating-score {
-    font-size: 11px;
     font-weight: 600;
-    color: var(--text-muted);
-    margin-left: 4px;
-    min-width: 24px;
+  }
+
+  .favorite-btn.active .star-icon {
+    transform: scale(1.15);
+  }
+
+  .favorite-btn .star-icon {
+    font-size: 14px;
+    transition: transform 0.15s ease;
+  }
+
+  /* Quick Add to Active Plan Button */
+  .btn-quick-add {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: #fde68a;
+    padding: 5px 11px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: var(--transition);
+    white-space: nowrap;
+  }
+
+  .btn-quick-add:hover {
+    background: rgba(251, 191, 36, 0.25);
+    border-color: rgba(251, 191, 36, 0.6);
+    color: #fff;
+    transform: translateY(-1px);
+  }
+
+  /* Card Remove Button in Planner */
+  .btn-card-remove {
+    background: none;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 4px;
+    color: rgba(239, 68, 68, 0.7);
+    padding: 3px 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: var(--transition);
+  }
+
+  .btn-card-remove:hover {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #ef4444;
   }
 
   .history-item .doc-link {
     background: rgba(101, 109, 74, 0.1);
     border-color: rgba(101, 109, 74, 0.2);
-    padding: 6px 12px;
+    padding: 5px 10px;
     font-size: 12px;
     white-space: nowrap;
   }
@@ -1665,7 +1726,11 @@
 
     .history-item-right {
       width: 100%;
-      justify-content: space-between;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
       border-top: 1px solid rgba(255, 255, 255, 0.04);
       padding-top: 8px;
     }
