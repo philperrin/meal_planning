@@ -14,6 +14,7 @@ function doGet(e) {
   var template = HtmlService.createTemplateFromFile('Index');
   return template.evaluate()
     .setTitle('Automated Meal Planning Assistant')
+    .setFaviconUrl('https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f37d.png')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
