@@ -113,19 +113,29 @@ function main() {
   const description = getCommitDescription();
   console.log(`${COLORS.bright}Description:${COLORS.reset} ${COLORS.green}"${description}"${COLORS.reset}`);
 
-  const TOTAL_STEPS = 3;
+  const TOTAL_STEPS = 4;
 
   try {
-    // Step 1: Git Push
-    logStep(1, TOTAL_STEPS, 'Pushing commits to remote repository (GitHub)...');
+    // Step 1: Run Automated Test Suite
+    logStep(1, TOTAL_STEPS, 'Running automated test suite...');
+    try {
+      runCommand('node test/test-suite.js');
+    } catch (testErr) {
+      console.error(`\n${COLORS.red}${COLORS.bright}🛑 SHIPMENT ABORTED: Automated test suite failed!${COLORS.reset}`);
+      console.error(`${COLORS.yellow}Fix the test failures before pushing to GitHub or Google Apps Script.${COLORS.reset}\n`);
+      process.exit(1);
+    }
+
+    // Step 2: Git Push
+    logStep(2, TOTAL_STEPS, 'Pushing commits to remote repository (GitHub)...');
     runCommand('git push');
 
-    // Step 2: Push to Google Apps Script
-    logStep(2, TOTAL_STEPS, 'Pushing code to Google Apps Script (clasp push)...');
+    // Step 3: Push to Google Apps Script
+    logStep(3, TOTAL_STEPS, 'Pushing code to Google Apps Script (clasp push)...');
     runCommand('npx clasp push -f');
 
-    // Step 3: Deploy new version to Google Apps Script
-    logStep(3, TOTAL_STEPS, 'Updating deployment in Google Apps Script (clasp deploy)...');
+    // Step 4: Deploy new version to Google Apps Script
+    logStep(4, TOTAL_STEPS, 'Updating deployment in Google Apps Script (clasp deploy)...');
     
     const deploymentId = getTargetDeploymentId();
     if (deploymentId) {

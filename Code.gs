@@ -83,6 +83,7 @@ function loadAppData() {
     }
     
     var effectiveKey = getEffectiveApiKey();
+    var userProperties = PropertiesService.getUserProperties();
     var scriptProperties = PropertiesService.getScriptProperties();
     var personalKey = userProperties.getProperty('GEMINI_API_KEY');
     var sharedKey = scriptProperties.getProperty('SHARED_GEMINI_API_KEY') || scriptProperties.getProperty('GEMINI_API_KEY');

@@ -10,6 +10,7 @@
     "pull": "clasp pull",
     "watch": "clasp push --watch",
     "deploy": "clasp deploy",
+    "test": "node test/test-suite.js",
     "ship": "node ship.js"
   },
   "keywords": [],

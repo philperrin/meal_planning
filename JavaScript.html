@@ -145,12 +145,12 @@
    */
   function renderCuisineGrid() {
     if (!els.cuisineGrid) return;
-    
+
     let html = "";
     CUISINES.forEach(c => {
       const currentPref = (appState.cuisinePreferences && appState.cuisinePreferences[c.name]) || "neutral";
       const statusClass = currentPref === 'prefer' ? 'status-prefer' : (currentPref === 'avoid' ? 'status-avoid' : '');
-      
+
       html += `
         <div class="cuisine-card ${statusClass}" id="cuisine-card-${escapeHtmlId(c.name)}">
           <div class="cuisine-info" title="${escapeHtml(c.name)}">
@@ -168,7 +168,7 @@
         </div>
       `;
     });
-    
+
     els.cuisineGrid.innerHTML = html;
   }
 
@@ -239,7 +239,7 @@
     } else if (status.activeKeyType === 'shared') {
       els.apiBadge.className = "api-badge shared";
       els.apiBadge.innerHTML = "• Starter Key Active (Shared)";
-      els.apiKeyInput.placeholder = "Paste personal AIzaSy... key to override";
+      els.apiKeyInput.placeholder = "Paste personal API key to override";
       els.apiKeyInput.value = "";
       if (descEl) {
         descEl.innerHTML = "The app is currently using the <strong>shared starter API key</strong>. You can generate meals right away, or click <em>✨ Create API Key</em> to get your own personal key for dedicated rate limits.";
