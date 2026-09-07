@@ -442,21 +442,241 @@ function parseRecipeDocFallback(docFile, dinersCount) {
   return recipe;
 }
 
+var TAG_DIRECTIVES = {
+  quick: "- Speed & Prep: Ensure all recipes require under 30 minutes of total active prep and cooking time combined.",
+  one_pot: "- Minimal Cleanup: Prioritize single-pot, single-skillet, or sheet-pan meals requiring minimal cookware and easy cleanup.",
+  kid_friendly: "- Family & Kids: Focus on mild, approachable, kid-approved flavor profiles with familiar textures and no overly pungent/spicy seasonings.",
+  slow_cooker: "- Hands-Off Cooking: Prioritize slow-cooker (Crock-Pot), multi-cooker, or Instant Pot recipes suitable for hands-off cooking.",
+  high_veggie: "- Fresh & Light: Emphasize vegetable-forward, nutrient-dense, lighter dinners with vibrant seasonal produce.",
+  comfort: "- Comfort Food: Feature hearty, satisfying, warm comfort food classics (e.g. casseroles, bakes, comforting pasta dishes)."
+};
+
+/**
+ * Builds prompt directives string from selected constraint tag keys.
+ */
+function buildTagDirectivesText(selectedTags) {
+  if (!Array.isArray(selectedTags) || selectedTags.length === 0) return "";
+  var lines = [];
+  selectedTags.forEach(function(tag) {
+    if (TAG_DIRECTIVES[tag]) {
+      lines.push(TAG_DIRECTIVES[tag]);
+    }
+  });
+  if (lines.length === 0) return "";
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * Calls the Gemini API to reroll/swap a single recipe at targetIndex, avoiding duplicates of all other meals in the plan.
+ */
+function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences, selectedTags) {
+  try {
+    targetIndex = parseInt(targetIndex, 10);
+    if (isNaN(targetIndex) || targetIndex < 0) {
+      throw new Error("Invalid target recipe index.");
+    }
+    planPreferences = planPreferences ? String(planPreferences).trim() : "";
+    selectedTags = Array.isArray(selectedTags) ? selectedTags : [];
+    existingRecipes = Array.isArray(existingRecipes) ? existingRecipes : [];
+
+    var file = getDatabaseFile();
+    var db = JSON.parse(file.getBlob().getDataAsString());
+    var prefs = db.preferences;
+
+    var effectiveKey = getEffectiveApiKey();
+    if (effectiveKey.keyType === 'none' || !effectiveKey.key) {
+      throw new Error("Gemini API key is not configured. Please set it in the Settings panel.");
+    }
+    var apiKey = effectiveKey.key;
+
+    // Extract Preferred and Avoided Cuisines
+    var cuisinePrefs = prefs.cuisinePreferences || {};
+    var preferredCuisines = [];
+    var avoidedCuisines = [];
+    for (var cuisineKey in cuisinePrefs) {
+      if (cuisinePrefs[cuisineKey] === 'prefer') {
+        preferredCuisines.push(cuisineKey);
+      } else if (cuisinePrefs[cuisineKey] === 'avoid') {
+        avoidedCuisines.push(cuisineKey);
+      }
+    }
+    var cuisineConstraintText = "";
+    if (preferredCuisines.length > 0) {
+      cuisineConstraintText += "- Preferred Cuisines: Prioritize and feature dinner recipes inspired by the following cuisines: " + preferredCuisines.join(", ") + ".\n";
+    }
+    if (avoidedCuisines.length > 0) {
+      cuisineConstraintText += "- Avoided Cuisines: Strictly DO NOT generate any recipes, flavor profiles, or dishes associated with the following cuisines: " + avoidedCuisines.join(", ") + ".\n";
+    }
+
+    // Build Avoid Duplicates list from all existing recipes in the plan
+    var existingNames = [];
+    existingRecipes.forEach(function(r, idx) {
+      if (r && r.name && idx !== targetIndex) {
+        existingNames.push(r.name);
+      }
+    });
+    if (existingRecipes[targetIndex] && existingRecipes[targetIndex].name) {
+      existingNames.push(existingRecipes[targetIndex].name);
+    }
+
+    var avoidText = "";
+    if (existingNames.length > 0) {
+      avoidText = "- Avoid Duplicating Planned Meals: The user already has or wants to replace the following dishes: [" + 
+                  existingNames.join(", ") + "]. Do NOT generate duplicates or dishes with identical primary flavor profiles.\n";
+    }
+
+    var tagDirectivesText = buildTagDirectivesText(selectedTags);
+
+    var prompt = "You are a professional chef. Generate exactly 1 single replacement dinner recipe. " +
+                 "Scale all ingredient quantities in the recipe to feed exactly " + prefs.dinersCount + " diners.\n" +
+                 "You MUST strictly follow these constraints:\n" +
+                 "- Allergy Constraint: " + (prefs.allergies || "None specified") + "\n" +
+                 "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
+                 cuisineConstraintText +
+                 avoidText +
+                 tagDirectivesText +
+                 (planPreferences ? "- Specific Preferences / Requests for this meal plan: " + planPreferences + "\n\n" : "\n\n") +
+                 "Provide a unique, delicious dinner meal. The recipe must have ingredients, amounts, units, and clear step-by-step instructions. " +
+                 "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";
+
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
+
+    var payload = {
+      contents: [
+        {
+          parts: [
+            { text: prompt }
+          ]
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            name: { type: "STRING" },
+            description: { type: "STRING" },
+            prepTime: { type: "STRING", description: "e.g., '15 mins'" },
+            cookTime: { type: "STRING", description: "e.g., '35 mins'" },
+            ingredients: {
+              type: "ARRAY",
+              items: {
+                type: "OBJECT",
+                properties: {
+                  name: { type: "STRING", description: "Ingredient name (e.g. russet potatoes, olive oil)" },
+                  amount: { type: "NUMBER", description: "Numerical quantity" },
+                  unit: { type: "STRING", description: "Unit of measure (e.g. lbs, oz, tbsp, cups, whole)" }
+                },
+                required: ["name", "amount", "unit"]
+              }
+            },
+            instructions: {
+              type: "ARRAY",
+              items: { type: "STRING" }
+            }
+          },
+          required: ["name", "description", "prepTime", "cookTime", "ingredients", "instructions"]
+        }
+      }
+    };
+
+    var options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    var response = UrlFetchApp.fetch(url, options);
+    var responseCode = response.getResponseCode();
+    var responseText = response.getContentText();
+
+    if (responseCode !== 200) {
+      if (responseCode === 429) {
+        if (effectiveKey.keyType === 'shared') {
+          throw new Error("The shared starter API quota is temporarily full. Please wait a moment, or add your own free personal API key in Settings for instant dedicated access.");
+        } else {
+          throw new Error("Your personal Gemini API rate limit / quota has been reached. Please check your Google AI Studio quota limits.");
+        }
+      }
+      throw new Error("Gemini API error (Status " + responseCode + "): " + responseText);
+    }
+
+    var jsonResponse = JSON.parse(responseText);
+    var responseJsonText = jsonResponse.candidates[0].content.parts[0].text;
+    var newRecipe = JSON.parse(responseJsonText);
+
+    if (!newRecipe || !newRecipe.name) {
+      throw new Error("Gemini returned an invalid replacement recipe.");
+    }
+
+    // Update active plan in database
+    if (!db.mealPlan) {
+      db.mealPlan = {
+        recipes: [],
+        approved: false,
+        generatedAt: new Date().toISOString(),
+        executionResult: null
+      };
+    }
+    if (!db.mealPlan.recipes) {
+      db.mealPlan.recipes = [];
+    }
+
+    if (targetIndex < db.mealPlan.recipes.length) {
+      db.mealPlan.recipes[targetIndex] = newRecipe;
+    } else {
+      db.mealPlan.recipes.push(newRecipe);
+    }
+    db.lastUpdated = new Date().toISOString();
+    file.setContent(JSON.stringify(db, null, 2));
+
+    return {
+      success: true,
+      newRecipe: newRecipe,
+      targetIndex: targetIndex,
+      db: db
+    };
+  } catch (e) {
+    Logger.log("Error rerolling single recipe: " + e.toString());
+    throw new Error("Failed to swap recipe: " + e.message);
+  }
+}
+
 /**
  * Calls the Gemini API to generate a weekly meal plan based on preferences,
- * supporting ephemeral reuse of past recipes.
+ * supporting ephemeral reuse of past recipes, locked recipe preservation, and constraint tags.
  */
-function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames) {
+function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, selectedTags, lockedIndices) {
   try {
     mealCount = parseInt(mealCount, 10) || 7;
     planPreferences = planPreferences ? String(planPreferences).trim() : "";
     reusedRecipeNames = Array.isArray(reusedRecipeNames) ? reusedRecipeNames : [];
+    selectedTags = Array.isArray(selectedTags) ? selectedTags : [];
+    lockedIndices = Array.isArray(lockedIndices) ? lockedIndices : [];
     
     var file = getDatabaseFile();
     var db = JSON.parse(file.getBlob().getDataAsString());
     var prefs = db.preferences;
     var recipeLibrary = db.recipeLibrary || {};
+    var existingPlanRecipes = (db.mealPlan && Array.isArray(db.mealPlan.recipes)) ? db.mealPlan.recipes : [];
     
+    // Resolve locked recipes from existing active plan
+    var lockedMap = {};
+    var lockedNames = [];
+    var validLockedCount = 0;
+    lockedIndices.forEach(function(idx) {
+      var numIdx = parseInt(idx, 10);
+      if (!isNaN(numIdx) && numIdx >= 0 && numIdx < existingPlanRecipes.length && numIdx < mealCount) {
+        var rec = existingPlanRecipes[numIdx];
+        if (rec && rec.name) {
+          lockedMap[numIdx] = rec;
+          lockedNames.push(rec.name);
+          validLockedCount++;
+        }
+      }
+    });
+
     // Resolve reused recipes
     var resolvedReused = [];
     reusedRecipeNames.forEach(function(rName) {
@@ -496,15 +716,13 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames) {
       }
     });
     
-    // Limit reused count to mealCount
-    var reusedToInclude = resolvedReused.slice(0, mealCount);
-    var remainingCount = mealCount - reusedToInclude.length;
-    var combinedRecipes = [];
+    // Calculate remaining needed slots
+    var maxReusedSlots = Math.max(0, mealCount - validLockedCount);
+    var reusedToInclude = resolvedReused.slice(0, maxReusedSlots);
+    var remainingCount = mealCount - (validLockedCount + reusedToInclude.length);
+    var newlyGeneratedRecipes = [];
     
-    if (remainingCount <= 0) {
-      // All recipes satisfied via reuse - no need to call Gemini
-      combinedRecipes = reusedToInclude;
-    } else {
+    if (remainingCount > 0) {
       // Need to generate remainingCount recipes with Gemini
       var effectiveKey = getEffectiveApiKey();
       if (effectiveKey.keyType === 'none' || !effectiveKey.key) {
@@ -531,12 +749,20 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames) {
         cuisineConstraintText += "- Avoided Cuisines: Strictly DO NOT generate any recipes, flavor profiles, or dishes associated with the following cuisines: " + avoidedCuisines.join(", ") + ".\n";
       }
       
+      // Avoid duplicating locked and reused recipes
+      var avoidNames = [];
+      reusedToInclude.forEach(function(r) { avoidNames.push(r.name); });
+      lockedNames.forEach(function(name) {
+        if (avoidNames.indexOf(name) === -1) avoidNames.push(name);
+      });
+
       var reusedAvoidText = "";
-      if (reusedToInclude.length > 0) {
-        var reusedNames = reusedToInclude.map(function(r) { return r.name; });
-        reusedAvoidText = "- Avoid Duplicating Planned Meals: The user has already selected the following dishes for this meal plan: [" + 
-                          reusedNames.join(", ") + "]. Do NOT generate duplicates or dishes with identical primary flavor profiles.\n";
+      if (avoidNames.length > 0) {
+        reusedAvoidText = "- Avoid Duplicating Planned Meals: The user has already selected/locked the following dishes for this meal plan: [" + 
+                          avoidNames.join(", ") + "]. Do NOT generate duplicates or dishes with identical primary flavor profiles.\n";
       }
+
+      var tagDirectivesText = buildTagDirectivesText(selectedTags);
 
       // Construct the Gemini API Prompt
       var prompt = "You are a professional chef. Generate a dinner meal plan consisting of exactly " + remainingCount + " dinner recipes. " +
@@ -546,6 +772,7 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames) {
                    "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
                    cuisineConstraintText +
                    reusedAvoidText +
+                   tagDirectivesText +
                    (planPreferences ? "- Specific Preferences / Requests for this meal plan: " + planPreferences + "\n\n" : "\n\n") +
                    "Provide a variety of dinner meals. Every recipe must have ingredients, amounts, units, and clear step-by-step instructions. " +
                    "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";
@@ -632,13 +859,29 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames) {
         throw new Error("Gemini returned an empty recipes list.");
       }
       
-      combinedRecipes = reusedToInclude.concat(result.recipes);
+      newlyGeneratedRecipes = result.recipes;
+    }
+    
+    // Merge locked recipes in place, then fill empty slots with reused + newly generated
+    var poolOfAvailable = reusedToInclude.concat(newlyGeneratedRecipes);
+    var finalRecipes = [];
+    var poolIdx = 0;
+    
+    for (var i = 0; i < mealCount; i++) {
+      if (lockedMap[i]) {
+        finalRecipes.push(lockedMap[i]);
+      } else if (poolIdx < poolOfAvailable.length) {
+        finalRecipes.push(poolOfAvailable[poolIdx]);
+        poolIdx++;
+      }
     }
     
     // Save to the database as pending approval
     db.mealPlan = {
-      recipes: combinedRecipes,
+      recipes: finalRecipes,
       approved: false,
+      selectedTags: selectedTags,
+      lockedIndices: Object.keys(lockedMap).map(function(k) { return parseInt(k, 10); }),
       generatedAt: new Date().toISOString(),
       executionResult: null
     };

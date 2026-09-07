@@ -136,6 +136,37 @@
               night that includes margherita pizza')</div>
             <textarea id="plan-preferences-input" rows="2" style="min-height: 70px;"></textarea>
           </div>
+          <!-- MPA-11: Quick Mood & Constraint Chips -->
+          <div class="planner-chips-section">
+            <div class="planner-chips-label">⚡ Quick Mood & Style Presets:</div>
+            <div class="planner-chips-grid" id="planner-chips-container">
+              <button type="button" class="filter-chip" id="chip-quick" data-tag="quick" onclick="handleToggleFilterChip('quick')">
+                <span class="chip-icon">⚡</span>
+                <span>20-30 Min Quick Meals</span>
+              </button>
+              <button type="button" class="filter-chip" id="chip-one_pot" data-tag="one_pot" onclick="handleToggleFilterChip('one_pot')">
+                <span class="chip-icon">🥘</span>
+                <span>One-Pot / Sheet Pan</span>
+              </button>
+              <button type="button" class="filter-chip" id="chip-kid_friendly" data-tag="kid_friendly" onclick="handleToggleFilterChip('kid_friendly')">
+                <span class="chip-icon">👶</span>
+                <span>Kid-Friendly / Picky-Safe</span>
+              </button>
+              <button type="button" class="filter-chip" id="chip-slow_cooker" data-tag="slow_cooker" onclick="handleToggleFilterChip('slow_cooker')">
+                <span class="chip-icon">❄️</span>
+                <span>Slow Cooker / Instant Pot</span>
+              </button>
+              <button type="button" class="filter-chip" id="chip-high_veggie" data-tag="high_veggie" onclick="handleToggleFilterChip('high_veggie')">
+                <span class="chip-icon">🥦</span>
+                <span>High-Veggie / Light</span>
+              </button>
+              <button type="button" class="filter-chip" id="chip-comfort" data-tag="comfort" onclick="handleToggleFilterChip('comfort')">
+                <span class="chip-icon">🧀</span>
+                <span>Comfort Classics</span>
+              </button>
+            </div>
+          </div>
+
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <label for="meal-count-input"

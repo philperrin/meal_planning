@@ -225,34 +225,66 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
       })
     },
     UrlFetchApp: {
-      fetch: () => ({
-        getResponseCode: () => 200,
-        getContentText: () => JSON.stringify({
-          candidates: [{
-            content: {
-              parts: [{
-                text: JSON.stringify({
-                  recipes: [
-                    {
-                      name: "Mock Recipe",
-                      description: "Tasty mock meal",
-                      prepTime: "10 mins",
-                      cookTime: "20 mins",
-                      ingredients: [{ name: "Olive oil", amount: 2, unit: "tbsp" }],
-                      instructions: ["Cook and serve."]
-                    }
-                  ]
-                })
-              }]
-            }
-          }]
-        })
-      })
+      fetch: (url, options) => {
+        let payload = null;
+        try {
+          if (options && options.payload) {
+            payload = JSON.parse(options.payload);
+          }
+        } catch (e) {}
+
+        sandbox._lastFetchedRequest = { url, options, payload };
+
+        const isSingle = payload && payload.generationConfig && payload.generationConfig.responseSchema && payload.generationConfig.responseSchema.properties && payload.generationConfig.responseSchema.properties.name;
+
+        let count = 1;
+        if (payload && payload.contents && payload.contents[0] && payload.contents[0].parts && payload.contents[0].parts[0]) {
+          const match = payload.contents[0].parts[0].text.match(/exactly (\d+) dinner recipes/);
+          if (match) count = parseInt(match[1], 10);
+        }
+
+        const mockList = [];
+        for (let i = 0; i < count; i++) {
+          mockList.push({
+            name: count === 1 ? "Mock Recipe" : `Mock Recipe ${i + 1}`,
+            description: "Tasty mock meal",
+            prepTime: "10 mins",
+            cookTime: "20 mins",
+            ingredients: [{ name: "Olive oil", amount: 2, unit: "tbsp" }],
+            instructions: ["Cook and serve."]
+          });
+        }
+
+        const responseObj = isSingle ? {
+          name: "Replacement Lemon Salmon",
+          description: "Fresh replacement dish",
+          prepTime: "15 mins",
+          cookTime: "20 mins",
+          ingredients: [{ name: "salmon", amount: 2, unit: "fillets" }],
+          instructions: ["Season and bake."]
+        } : {
+          recipes: mockList
+        };
+
+        return {
+          getResponseCode: () => 200,
+          getContentText: () => JSON.stringify({
+            candidates: [{
+              content: {
+                parts: [{
+                  text: JSON.stringify(responseObj)
+                }]
+              }
+            }]
+          })
+        };
+      }
     },
     MimeType: { PLAIN_TEXT: 'text/plain' },
     getMockDbState: () => dbState,
     getUserPropsStore: () => userPropsStore,
-    getScriptPropsStore: () => scriptPropsStore
+    getScriptPropsStore: () => scriptPropsStore,
+    getLastFetchedRequest: () => sandbox._lastFetchedRequest
   };
 
   const context = vm.createContext(sandbox);
@@ -966,6 +998,126 @@ describe('12. Interactive In-App Grocery Checklist & Aisle Sorting (MPA-13)', ()
     assert(approveRes.db.mealPlan.executionResult.shoppingList !== undefined, "shoppingList missing from executionResult");
     assertEqual(approveRes.db.mealPlan.executionResult.shoppingList.length, 4);
     assertEqual(approveRes.db.mealPlan.shoppingList.length, 4);
+  });
+});
+
+// 13. Single-Recipe Swap / Reroll Backend & Duplicate Avoidance (MPA-10)
+describe('13. Single-Recipe Swap / Reroll Backend & Duplicate Avoidance (MPA-10)', () => {
+  test('rerollSingleRecipeServer replaces target recipe in DB, avoids duplicates, and passes tags', () => {
+    const initialPlan = {
+      recipes: [
+        { name: "Tacos", prepTime: "10 mins", cookTime: "15 mins", ingredients: [], instructions: [] },
+        { name: "Pasta Primavera", prepTime: "15 mins", cookTime: "20 mins", ingredients: [], instructions: [] },
+        { name: "Stir Fry", prepTime: "10 mins", cookTime: "10 mins", ingredients: [], instructions: [] }
+      ],
+      approved: false,
+      generatedAt: "2026-09-07T10:00:00Z"
+    };
+
+    const ctx = createMockGasContext({
+      preferences: { dinersCount: 4, allergies: "Peanuts", dietaryPreferences: "Low carb", cuisinePreferences: { Italian: "prefer" } },
+      mealPlan: initialPlan
+    }, { GEMINI_API_KEY: "AIzaTestKey123" });
+
+    const res = ctx.rerollSingleRecipeServer(1, initialPlan.recipes, "Extra lemon please", ["quick", "one_pot"]);
+    assertEqual(res.success, true);
+    assertEqual(res.targetIndex, 1);
+    assertEqual(res.newRecipe.name, "Replacement Lemon Salmon");
+    assertEqual(res.db.mealPlan.recipes.length, 3);
+    assertEqual(res.db.mealPlan.recipes[0].name, "Tacos");
+    assertEqual(res.db.mealPlan.recipes[1].name, "Replacement Lemon Salmon");
+    assertEqual(res.db.mealPlan.recipes[2].name, "Stir Fry");
+
+    // Verify Prompt constraints
+    const lastReq = ctx.getLastFetchedRequest();
+    assert(lastReq && lastReq.payload, "Missing last fetched request");
+    const promptText = lastReq.payload.contents[0].parts[0].text;
+    assert(promptText.includes("Tacos"), "Avoid list missing Tacos");
+    assert(promptText.includes("Pasta Primavera"), "Avoid list missing Pasta Primavera");
+    assert(promptText.includes("Stir Fry"), "Avoid list missing Stir Fry");
+    assert(promptText.includes("Italian"), "Cuisine preference missing from prompt");
+    assert(promptText.includes("Peanuts"), "Allergy constraint missing from prompt");
+    assert(promptText.includes("Speed & Prep"), "Quick tag directive missing from prompt");
+    assert(promptText.includes("Minimal Cleanup"), "One-pot tag directive missing from prompt");
+  });
+});
+
+// 14. Card Lock Support & Partial Plan Regeneration (MPA-10)
+describe('14. Card Lock Support & Partial Plan Regeneration (MPA-10)', () => {
+  test('generateMealPlanServer preserves locked cards in place and generates remaining count', () => {
+    const existingPlan = {
+      recipes: [
+        { name: "Locked Salmon Skillet", prepTime: "10 mins", cookTime: "15 mins", ingredients: [], instructions: [] },
+        { name: "Old Chicken Soup", prepTime: "15 mins", cookTime: "20 mins", ingredients: [], instructions: [] },
+        { name: "Locked Beef Bowls", prepTime: "10 mins", cookTime: "10 mins", ingredients: [], instructions: [] },
+        { name: "Old Salad", prepTime: "5 mins", cookTime: "0 mins", ingredients: [], instructions: [] }
+      ],
+      approved: false,
+      generatedAt: "2026-09-07T10:00:00Z"
+    };
+
+    const ctx = createMockGasContext({
+      preferences: { dinersCount: 2, allergies: "None", dietaryPreferences: "" },
+      mealPlan: existingPlan,
+      recipeLibrary: {}
+    }, { GEMINI_API_KEY: "AIzaTestKey123" });
+
+    // Lock index 0 and index 2, generate 4 meals
+    const res = ctx.generateMealPlanServer(4, "", [], ["kid_friendly"], [0, 2]);
+    assertEqual(res.success, true);
+    assertEqual(res.db.mealPlan.recipes.length, 4);
+    assertEqual(res.db.mealPlan.recipes[0].name, "Locked Salmon Skillet");
+    assertEqual(res.db.mealPlan.recipes[2].name, "Locked Beef Bowls");
+    assertEqual(res.db.mealPlan.lockedIndices.length, 2);
+    assert(res.db.mealPlan.lockedIndices.includes(0));
+    assert(res.db.mealPlan.lockedIndices.includes(2));
+
+    // Verify Gemini prompt avoidance and count
+    const lastReq = ctx.getLastFetchedRequest();
+    assert(lastReq && lastReq.payload, "Missing last fetched request");
+    const promptText = lastReq.payload.contents[0].parts[0].text;
+    assert(promptText.includes("Locked Salmon Skillet"), "Locked recipe missing from avoidance text");
+    assert(promptText.includes("Locked Beef Bowls"), "Locked recipe missing from avoidance text");
+    assert(promptText.includes("Family & Kids"), "Kid-friendly directive missing from prompt");
+  });
+});
+
+// 15. Quick-Filter Mood & Constraint Chips (MPA-11)
+describe('15. Quick-Filter Mood & Constraint Chips (MPA-11)', () => {
+  test('Tag directives mapping and frontend template integration', () => {
+    const ctx = createMockGasContext({}, { GEMINI_API_KEY: "test" });
+    const allTags = ["quick", "one_pot", "kid_friendly", "slow_cooker", "high_veggie", "comfort"];
+    const directives = ctx.buildTagDirectivesText(allTags);
+
+    assert(directives.includes("Speed & Prep"), "Missing quick tag directive");
+    assert(directives.includes("Minimal Cleanup"), "Missing one-pot directive");
+    assert(directives.includes("Family & Kids"), "Missing kid-friendly directive");
+    assert(directives.includes("Hands-Off Cooking"), "Missing slow-cooker directive");
+    assert(directives.includes("Fresh & Light"), "Missing high-veggie directive");
+    assert(directives.includes("Comfort Food"), "Missing comfort directive");
+
+    // Check Index.html for all 6 chip definitions
+    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+    assert(indexHtml.includes('id="planner-chips-container"'), "Missing planner-chips-container in Index.html");
+    allTags.forEach(tag => {
+      assert(indexHtml.includes(`data-tag="${tag}"`), `Missing chip data-tag="${tag}" in Index.html`);
+    });
+
+    // Check Styles.html for chip and lock classes
+    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+    assert(stylesHtml.includes('.filter-chip'), "Missing .filter-chip in Styles.html");
+    assert(stylesHtml.includes('.filter-chip.active'), "Missing .filter-chip.active in Styles.html");
+    assert(stylesHtml.includes('.btn-card-lock'), "Missing .btn-card-lock in Styles.html");
+    assert(stylesHtml.includes('.btn-card-swap'), "Missing .btn-card-swap in Styles.html");
+    assert(stylesHtml.includes('.recipe-card.locked'), "Missing .recipe-card.locked in Styles.html");
+    assert(stylesHtml.includes('.card-reroll-overlay'), "Missing .card-reroll-overlay in Styles.html");
+
+    // Check JavaScript.html for handlers
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    assert(jsHtml.includes('handleToggleFilterChip'), "Missing handleToggleFilterChip in JavaScript.html");
+    assert(jsHtml.includes('handleToggleRecipeLock'), "Missing handleToggleRecipeLock in JavaScript.html");
+    assert(jsHtml.includes('handleRerollSingleRecipe'), "Missing handleRerollSingleRecipe in JavaScript.html");
+    assert(jsHtml.includes('rerollSingleRecipeServer'), "Missing rerollSingleRecipeServer call in JavaScript.html");
   });
 });
 

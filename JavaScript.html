@@ -19,6 +19,8 @@
       activeKeyType: 'none'
     },
     selectedRecipes: new Set(),
+    selectedTags: new Set(),
+    lockedIndices: new Set(),
     cuisinePreferences: {},
     reusedRecipes: new Set(),
     historyData: {
@@ -205,11 +207,129 @@
     appState.cuisinePreferences = Object.assign({}, prefs.cuisinePreferences || {});
     renderCuisineGrid();
 
+    // Restore selected constraint tags and locked indices if present in DB
+    if (appState.db.mealPlan) {
+      if (Array.isArray(appState.db.mealPlan.selectedTags)) {
+        appState.selectedTags = new Set(appState.db.mealPlan.selectedTags);
+      }
+      if (Array.isArray(appState.db.mealPlan.lockedIndices)) {
+        appState.lockedIndices = new Set(appState.db.mealPlan.lockedIndices);
+      }
+    }
+    updateFilterChipsUI();
+
     // Update API Badge
     updateApiBadge();
 
     // Render Meal Plan
     renderMealPlan();
+  }
+
+  /**
+   * Update visual active states for preset constraint chips
+   */
+  function updateFilterChipsUI() {
+    const chips = document.querySelectorAll('.filter-chip');
+    chips.forEach(chip => {
+      const tag = chip.getAttribute('data-tag');
+      if (tag && appState.selectedTags.has(tag)) {
+        chip.classList.add('active');
+      } else {
+        chip.classList.remove('active');
+      }
+    });
+  }
+
+  /**
+   * Toggle a preset mood/constraint filter chip
+   */
+  function handleToggleFilterChip(tagKey) {
+    if (!tagKey) return;
+    if (appState.selectedTags.has(tagKey)) {
+      appState.selectedTags.delete(tagKey);
+    } else {
+      appState.selectedTags.add(tagKey);
+    }
+    updateFilterChipsUI();
+  }
+
+  /**
+   * Toggle locked state for an individual recipe card
+   */
+  function handleToggleRecipeLock(event, idx) {
+    if (event) event.stopPropagation();
+    if (appState.lockedIndices.has(idx)) {
+      appState.lockedIndices.delete(idx);
+    } else {
+      appState.lockedIndices.add(idx);
+    }
+    
+    // Update db state in memory
+    if (appState.db.mealPlan) {
+      appState.db.mealPlan.lockedIndices = Array.from(appState.lockedIndices);
+    }
+    
+    renderMealPlan();
+    const recipeName = (appState.db.mealPlan && appState.db.mealPlan.recipes && appState.db.mealPlan.recipes[idx])
+      ? appState.db.mealPlan.recipes[idx].name
+      : `Recipe #${idx + 1}`;
+    
+    if (appState.lockedIndices.has(idx)) {
+      showToast(`🔒 Locked "${recipeName}" (preserved during regeneration).`);
+    } else {
+      showToast(`🔓 Unlocked "${recipeName}".`);
+    }
+  }
+
+  /**
+   * Re-roll or swap an individual recipe at target index with inline card loader
+   */
+  function handleRerollSingleRecipe(event, idx) {
+    if (event) event.stopPropagation();
+    if (!appState.db.mealPlan || !appState.db.mealPlan.recipes || !appState.db.mealPlan.recipes[idx]) return;
+
+    if (!appState.hasApiKey) {
+      showToast("Please configure an API Key in Settings first.", true);
+      switchView('settings');
+      return;
+    }
+
+    const card = document.getElementById(`recipe-${idx}`);
+    if (card) {
+      card.classList.add('rerolling');
+      let overlay = card.querySelector('.card-reroll-overlay');
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'card-reroll-overlay';
+        overlay.innerHTML = `
+          <div class="card-reroll-spinner"></div>
+          <div class="card-reroll-text">Finding replacement recipe...</div>
+        `;
+        card.appendChild(overlay);
+      }
+    }
+
+    const planPreferences = els.planPreferencesInput ? els.planPreferencesInput.value.trim() : "";
+    const selectedTagsList = Array.from(appState.selectedTags);
+    const currentRecipes = appState.db.mealPlan.recipes;
+    const oldRecipeName = currentRecipes[idx].name;
+
+    google.script.run
+      .withSuccessHandler(res => {
+        if (card) card.classList.remove('rerolling');
+        appState.db = res.db;
+        renderMealPlan();
+        showToast(`🔄 Replaced "${oldRecipeName}" with "${res.newRecipe.name}"!`);
+      })
+      .withFailureHandler(err => {
+        if (card) {
+          card.classList.remove('rerolling');
+          const overlay = card.querySelector('.card-reroll-overlay');
+          if (overlay) overlay.remove();
+        }
+        showToast("Failed to swap recipe: " + err.message, true);
+      })
+      .rerollSingleRecipeServer(idx, currentRecipes, planPreferences, selectedTagsList);
   }
 
   /**
@@ -1001,8 +1121,19 @@
     const reusedList = Array.from(appState.reusedRecipes);
     const count = parseInt(els.mealCountInput.value, 10) || 7;
     const planPreferences = els.planPreferencesInput ? els.planPreferencesInput.value.trim() : "";
+    const selectedTagsList = Array.from(appState.selectedTags);
+    const lockedList = Array.from(appState.lockedIndices);
 
-    if (reusedList.length < count && !appState.hasApiKey) {
+    // If all recipes are locked, notify user
+    if (appState.db.mealPlan && Array.isArray(appState.db.mealPlan.recipes) && appState.db.mealPlan.recipes.length > 0) {
+      const validLocked = lockedList.filter(i => i < appState.db.mealPlan.recipes.length && i < count);
+      if (validLocked.length >= count) {
+        showToast("All recipes are currently locked! Unlock a recipe to regenerate.", true);
+        return;
+      }
+    }
+
+    if (reusedList.length + lockedList.length < count && !appState.hasApiKey) {
       showToast("Please configure an API Key in Settings first.", true);
       switchView('settings');
       return;
@@ -1010,9 +1141,10 @@
 
     const usingShared = appState.apiKeyStatus && appState.apiKeyStatus.activeKeyType === 'shared';
     let subtext = "";
-    if (reusedList.length > 0) {
-      const neededNew = Math.max(0, count - reusedList.length);
-      subtext = `Re-using ${Math.min(count, reusedList.length)} past recipes + generating ${neededNew} new dishes (scaling for ${els.prefDiners.value || 2} diners).`;
+    if (lockedList.length > 0 || reusedList.length > 0) {
+      const keptCount = Math.min(count, lockedList.length + reusedList.length);
+      const neededNew = Math.max(0, count - keptCount);
+      subtext = `Keeping ${keptCount} locked/reused dishes + generating ${neededNew} new dishes (scaling for ${els.prefDiners.value || 2} diners).`;
     } else {
       subtext = usingShared
         ? `Generating ${count} dinner recipes using shared starter key. Scaling for ${els.prefDiners.value || 2} diners (10-15s).`
@@ -1026,6 +1158,9 @@
         hideLoader();
         appState.db = res.db;
         appState.reusedRecipes.clear();
+        if (res.db && res.db.mealPlan && Array.isArray(res.db.mealPlan.lockedIndices)) {
+          appState.lockedIndices = new Set(res.db.mealPlan.lockedIndices);
+        }
         updateReuseBanners();
         renderMealPlan();
         showToast("Meal plan generated successfully!");
@@ -1034,7 +1169,7 @@
         hideLoader();
         showToast("Generation failed: " + err.message, true);
       })
-      .generateMealPlanServer(count, planPreferences, reusedList);
+      .generateMealPlanServer(count, planPreferences, reusedList, selectedTagsList, lockedList);
   }
 
   /**
@@ -1149,12 +1284,15 @@
       const ratingInfo = (appState.historyData && appState.historyData.ratings && appState.historyData.ratings[recipe.name]) || (appState.db.recipeRatings && appState.db.recipeRatings[recipe.name]);
       const isFav = ratingInfo ? (ratingInfo.isFavorite === true || ratingInfo.rating > 0) : false;
 
+      // Lock status
+      const isLocked = appState.lockedIndices.has(idx);
+
       // Build recipe details list
       const ingredientsList = recipe.ingredients.map(ing => `<li>${escapeHtml(ing.amount)} ${escapeHtml(ing.unit)} ${escapeHtml(ing.name)}</li>`).join('');
       const instructionsList = recipe.instructions.map(step => `<li>${escapeHtml(step)}</li>`).join('');
 
       html += `
-      <div class="recipe-card approved-card" id="recipe-${idx}" onclick="handleCardClick(event, ${idx})">
+      <div class="recipe-card approved-card ${isLocked ? 'locked' : ''}" id="recipe-${idx}" onclick="handleCardClick(event, ${idx})">
         <div class="recipe-card-header">
           <div class="recipe-title-group">
             <div class="recipe-title">${escapeHtml(recipe.name)}</div>
@@ -1167,7 +1305,22 @@
                 <span>${isFav ? 'Favorite' : 'Star'}</span>
               </button>
               ${!plan.approved ? `
-                <button type="button" class="btn-card-remove" onclick="handleRemoveRecipeFromPlan(event, ${idx})" title="Remove from this week's plan">
+                <button type="button" class="btn-card-lock ${isLocked ? 'active' : ''}"
+                  onclick="handleToggleRecipeLock(event, ${idx})"
+                  title="${isLocked ? 'Unlock recipe' : 'Lock recipe to keep during plan regeneration'}">
+                  <span class="lock-icon">${isLocked ? '🔒' : '🔓'}</span>
+                  <span>${isLocked ? 'Locked' : 'Lock'}</span>
+                </button>
+                <button type="button" class="btn-card-swap ${isLocked ? 'disabled' : ''}"
+                  ${isLocked ? 'disabled' : ''}
+                  onclick="handleRerollSingleRecipe(event, ${idx})"
+                  title="${isLocked ? 'Unlock recipe to swap' : 'Swap / Reroll this individual recipe'}">
+                  <span>🔄 Swap</span>
+                </button>
+                <button type="button" class="btn-card-remove" 
+                  ${isLocked ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : ''}
+                  onclick="${isLocked ? 'event.stopPropagation()' : `handleRemoveRecipeFromPlan(event, ${idx})`}" 
+                  title="${isLocked ? 'Unlock recipe to remove' : 'Remove from this week\'s plan'}">
                   <span>✕ Remove</span>
                 </button>
               ` : ''}
@@ -1247,6 +1400,20 @@
     
     const removedRecipe = appState.db.mealPlan.recipes[idx];
     appState.db.mealPlan.recipes.splice(idx, 1);
+    
+    // Shift locked indices accordingly
+    const updatedLocked = new Set();
+    appState.lockedIndices.forEach(lockedIdx => {
+      if (lockedIdx < idx) {
+        updatedLocked.add(lockedIdx);
+      } else if (lockedIdx > idx) {
+        updatedLocked.add(lockedIdx - 1);
+      }
+    });
+    appState.lockedIndices = updatedLocked;
+    if (appState.db.mealPlan) {
+      appState.db.mealPlan.lockedIndices = Array.from(updatedLocked);
+    }
     
     renderMealPlan();
     showToast(removedRecipe ? `Removed "${removedRecipe.name}" from plan.` : "Removed meal from plan.");

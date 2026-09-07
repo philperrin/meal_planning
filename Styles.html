@@ -1704,6 +1704,161 @@
     color: #ef4444;
   }
 
+  /* MPA-11: Quick Mood & Style Constraint Chips */
+  .planner-chips-section {
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+
+  .planner-chips-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 10px;
+  }
+
+  .planner-chips-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .filter-chip {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    border-radius: 20px;
+    padding: 7px 13px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 38px;
+  }
+
+  .filter-chip:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+  }
+
+  .filter-chip.active {
+    background: rgba(217, 119, 6, 0.18);
+    border-color: var(--accent-secondary);
+    color: #fde68a;
+    font-weight: 600;
+    box-shadow: 0 0 10px rgba(217, 119, 6, 0.2);
+  }
+
+  .filter-chip.active .chip-icon {
+    transform: scale(1.15);
+  }
+
+  .filter-chip .chip-icon {
+    font-size: 14px;
+    transition: transform 0.15s ease;
+  }
+
+  /* MPA-10: Card Lock & Swap Buttons */
+  .btn-card-lock,
+  .btn-card-swap {
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: var(--radius-sm);
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: var(--transition);
+    user-select: none;
+  }
+
+  .btn-card-lock:hover {
+    background: rgba(251, 191, 36, 0.08);
+    border-color: rgba(251, 191, 36, 0.3);
+    color: #fbbf24;
+    transform: translateY(-1px);
+  }
+
+  .btn-card-lock.active {
+    background: rgba(251, 191, 36, 0.18);
+    border-color: rgba(251, 191, 36, 0.6);
+    color: #fbbf24;
+    font-weight: 600;
+  }
+
+  .btn-card-swap:hover {
+    background: rgba(101, 109, 74, 0.2);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary-hover);
+    transform: translateY(-1px);
+  }
+
+  .btn-card-swap:disabled,
+  .btn-card-swap.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+    transform: none;
+  }
+
+  .recipe-card.locked {
+    border-top: 3px solid #fbbf24;
+  }
+
+  .recipe-card.rerolling {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.85;
+  }
+
+  .card-reroll-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(18, 24, 36, 0.88);
+    backdrop-filter: blur(3px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 10;
+    border-radius: var(--radius-md);
+    animation: fadeIn 0.2s ease-out;
+  }
+
+  .card-reroll-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid rgba(251, 191, 36, 0.2);
+    border-radius: 50%;
+    border-top-color: #fbbf24;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .card-reroll-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fbbf24;
+  }
+
   .history-item .doc-link {
     background: rgba(101, 109, 74, 0.1);
     border-color: rgba(101, 109, 74, 0.2);
