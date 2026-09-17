@@ -29,7 +29,13 @@
       favorites: [],
       ratings: {}
     },
-    historyTab: 'recent'
+    historyTab: 'recent',
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine !== false : true,
+    groceryModeState: {
+      active: false,
+      selectedCategory: 'all',
+      hideChecked: false
+    }
   };
 
   // Master Cuisine List (12 items in alphabetical order)
@@ -93,6 +99,8 @@
   document.addEventListener('DOMContentLoaded', () => {
     setupNavigation();
     setupPantryTagListeners();
+    initNetworkListeners();
+    initOfflineStorage();
     try {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('meal_planner_skip_welcome') === 'true') {
         switchView('planner');
@@ -167,11 +175,24 @@
    */
   function loadInitialData() {
     showLoader("Loading configuration...", "Retrieving your data from Google Drive");
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      const restored = restorePlanFromOfflineCache();
+      hideLoader();
+      if (restored) {
+        showToast("⚡ Offline Grocery Mode: Restored active plan from local cache.");
+      }
+      return;
+    }
     google.script.run
       .withSuccessHandler(onInitialDataLoaded)
       .withFailureHandler(err => {
         hideLoader();
-        showToast("Failed to load initial data: " + err.message, true);
+        const restored = restorePlanFromOfflineCache();
+        if (restored) {
+          showToast("⚡ Offline Mode: Active meal plan & shopping list loaded from local cache.", false);
+        } else {
+          showToast("Failed to load initial data: " + err.message, true);
+        }
       })
       .loadAppData();
   }
@@ -788,14 +809,214 @@
     }
   }
 
+  /* ==========================================================================
+     MPA-21: PWA & Offline Grocery Mode Helpers & Local Cache
+     ========================================================================== */
+  const OFFLINE_PLAN_CACHE_KEY = 'mp_active_plan_cache';
+
+  function getCustomGroceryStorageKey(plan) {
+    const planId = plan && (plan.generatedAt || (plan.executionResult && plan.executionResult.shoppingListDocName) || 'active');
+    return 'mp_custom_grocery_items_' + String(planId).replace(/[^a-zA-Z0-9]/g, '_');
+  }
+
+  function getStoredCustomGroceryItems(plan) {
+    try {
+      const key = getCustomGroceryStorageKey(plan);
+      const raw = localStorage.getItem(key);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveStoredCustomGroceryItems(plan, items) {
+    try {
+      const key = getCustomGroceryStorageKey(plan);
+      localStorage.setItem(key, JSON.stringify(Array.isArray(items) ? items : []));
+    } catch (e) {
+      console.warn("Could not save custom grocery items to localStorage: ", e);
+    }
+  }
+
+  function cacheActivePlanLocally(plan) {
+    if (!plan) return;
+    try {
+      localStorage.setItem(OFFLINE_PLAN_CACHE_KEY, JSON.stringify(plan));
+    } catch (e) {
+      console.warn("Could not cache active plan to localStorage:", e);
+    }
+  }
+
+  function restorePlanFromOfflineCache() {
+    try {
+      const raw = localStorage.getItem(OFFLINE_PLAN_CACHE_KEY);
+      if (!raw) return false;
+      const plan = JSON.parse(raw);
+      if (plan && plan.recipes && plan.recipes.length > 0) {
+        appState.db.mealPlan = plan;
+        renderMealPlan();
+        return true;
+      }
+    } catch (e) {
+      console.warn("Could not restore plan from offline cache:", e);
+    }
+    return false;
+  }
+
+  function initOfflineStorage() {
+    if (!appState.db.mealPlan) {
+      restorePlanFromOfflineCache();
+    }
+  }
+
+  function initNetworkListeners() {
+    updateNetworkStatusUI(typeof navigator !== 'undefined' ? navigator.onLine !== false : true);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        updateNetworkStatusUI(true);
+        showToast("🟢 Connected to network. Syncing data...", false);
+        syncOfflineChecklistToServer();
+      });
+
+      window.addEventListener('offline', () => {
+        updateNetworkStatusUI(false);
+        showToast("⚡ Offline Grocery Mode: Using local offline cache.", false);
+      });
+    }
+  }
+
+  function updateNetworkStatusUI(isOnline) {
+    appState.isOnline = isOnline;
+    const pill = document.getElementById('network-status-pill');
+    const label = document.getElementById('network-status-label');
+    if (!pill || !label) return;
+
+    if (isOnline) {
+      pill.classList.remove('offline');
+      pill.classList.add('online');
+      pill.title = "Network status: Online";
+      label.textContent = "Online";
+    } else {
+      pill.classList.remove('online');
+      pill.classList.add('offline');
+      pill.title = "Network status: Offline Mode (Working from local cache)";
+      label.textContent = "Offline Mode";
+    }
+  }
+
+  function syncOfflineChecklistToServer() {
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+
+    const checkedSet = getStoredShoppingChecklist(plan);
+    const checkedArray = Array.from(checkedSet);
+    const customItems = getStoredCustomGroceryItems(plan);
+
+    google.script.run
+      .withSuccessHandler(res => {
+        console.log("Synchronized shopping checklist with Drive DB:", res);
+      })
+      .withFailureHandler(err => {
+        console.warn("Background sync of shopping checklist deferred:", err);
+      })
+      .syncShoppingChecklistServer(checkedArray, customItems);
+  }
+
+  /**
+   * Consolidates shopping list including custom ad-hoc user items
+   */
+  function getConsolidatedShoppingList(plan) {
+    if (!plan) return [];
+    const baseList = (plan.executionResult && plan.executionResult.shoppingList) ||
+      plan.shoppingList ||
+      consolidateShoppingListClient(plan.recipes);
+
+    const result = (baseList || []).map(item => ({
+      name: item.name,
+      category: item.category || categorizeIngredient(item.name),
+      amounts: item.amounts ? item.amounts.slice() : []
+    }));
+
+    const customItems = getStoredCustomGroceryItems(plan);
+    customItems.forEach(custom => {
+      const existing = result.find(r => r.name.toLowerCase() === custom.name.toLowerCase());
+      if (existing) {
+        if (custom.amount) {
+          existing.amounts.push({ amount: custom.amount, unit: custom.unit || 'item' });
+        }
+      } else {
+        result.push({
+          name: custom.name,
+          category: custom.category || categorizeIngredient(custom.name),
+          amounts: custom.amount ? [{ amount: custom.amount, unit: custom.unit || 'item' }] : [],
+          isCustom: true
+        });
+      }
+    });
+
+    result.sort((a, b) => a.name.localeCompare(b.name));
+    return result;
+  }
+
+  /**
+   * Screen Wake Lock Controller
+   */
+  let wakeLockSentinel = null;
+
+  async function requestWakeLock() {
+    if (typeof navigator !== 'undefined' && 'wakeLock' in navigator && typeof navigator.wakeLock.request === 'function') {
+      try {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+        wakeLockSentinel.addEventListener('release', () => {
+          updateWakeLockUI(false);
+        });
+        updateWakeLockUI(true);
+      } catch (err) {
+        console.warn("Screen Wake Lock request was not granted:", err);
+        updateWakeLockUI(false);
+      }
+    } else {
+      updateWakeLockUI(false);
+    }
+  }
+
+  function releaseWakeLock() {
+    if (wakeLockSentinel) {
+      try {
+        wakeLockSentinel.release();
+      } catch (e) { }
+      wakeLockSentinel = null;
+    }
+    updateWakeLockUI(false);
+  }
+
+  function updateWakeLockUI(isActive) {
+    const badge = document.getElementById('grocery-wakelock-badge');
+    if (!badge) return;
+    if (isActive) {
+      badge.classList.remove('inactive');
+      badge.classList.add('active');
+      badge.innerHTML = `<span>☀️ Screen Awake</span>`;
+      badge.title = "Screen stays awake while shopping";
+    } else {
+      badge.classList.remove('active');
+      badge.classList.add('inactive');
+      badge.innerHTML = `<span>🌙 Auto-Sleep</span>`;
+      badge.title = "Screen will auto-sleep normally";
+    }
+  }
+
   /**
    * Render HTML markup for the In-App Interactive Grocery Checklist
    */
   function renderShoppingListHtml(plan) {
     if (!plan) return '';
-    const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
-      plan.shoppingList ||
-      consolidateShoppingListClient(plan.recipes);
+    const shoppingList = getConsolidatedShoppingList(plan);
 
     if (!shoppingList || shoppingList.length === 0) return '';
 
@@ -886,9 +1107,13 @@
             </p>
           </div>
           <div class="shopping-list-actions">
+            <button type="button" class="btn btn-sm" id="btn-open-grocery-mode" onclick="handleOpenGroceryMode()" style="background: var(--accent-primary); color: #ede0d4; font-weight: 600;">
+              <span class="btn-icon">🛒</span>
+              <span>Enter Grocery Mode</span>
+            </button>
             <button type="button" class="btn btn-gold btn-sm" id="btn-copy-shopping-list" onclick="handleCopyShoppingList()">
               <span class="btn-icon">📋</span>
-              <span id="btn-copy-shopping-text">Copy for Notes / Instacart</span>
+              <span id="btn-copy-shopping-text">Copy for Notes</span>
             </button>
             <button type="button" class="btn btn-secondary btn-sm" id="btn-reset-shopping-checklist" onclick="handleResetShoppingChecklist()">
               <span class="btn-icon">↺</span>
@@ -929,14 +1154,24 @@
     }
     saveStoredShoppingChecklist(plan, checkedSet);
 
-    // Update DOM row & checkbox
+    // Update DOM row & checkbox for standard list
     const itemSlug = escapeHtmlId(itemName);
     const rowEl = document.getElementById(`shop-row-${itemSlug}`);
     const checkEl = document.getElementById(`shop-check-${itemSlug}`);
     if (rowEl) rowEl.classList.toggle('checked', nextState);
     if (checkEl) checkEl.checked = nextState;
 
+    // Update DOM row & checkbox for Grocery Mode if active
+    const gRowEl = document.getElementById(`grocery-row-${itemSlug}`);
+    const gCheckEl = document.getElementById(`grocery-check-${itemSlug}`);
+    if (gRowEl) gRowEl.classList.toggle('checked', nextState);
+    if (gCheckEl) gCheckEl.checked = nextState;
+
     updateShoppingListProgressUI(plan, checkedSet);
+    if (appState.groceryModeState && appState.groceryModeState.active) {
+      updateGroceryModeStatsAndPills();
+    }
+    syncOfflineChecklistToServer();
   }
 
   /**
@@ -955,18 +1190,27 @@
 
     const itemSlug = escapeHtmlId(itemName);
     const rowEl = document.getElementById(`shop-row-${itemSlug}`);
+    const checkEl = document.getElementById(`shop-check-${itemSlug}`);
     if (rowEl) rowEl.classList.toggle('checked', isChecked);
+    if (checkEl) checkEl.checked = isChecked;
+
+    const gRowEl = document.getElementById(`grocery-row-${itemSlug}`);
+    const gCheckEl = document.getElementById(`grocery-check-${itemSlug}`);
+    if (gRowEl) gRowEl.classList.toggle('checked', isChecked);
+    if (gCheckEl) gCheckEl.checked = isChecked;
 
     updateShoppingListProgressUI(plan, checkedSet);
+    if (appState.groceryModeState && appState.groceryModeState.active) {
+      updateGroceryModeStatsAndPills();
+    }
+    syncOfflineChecklistToServer();
   }
 
   /**
    * Update progress bar, badges, and category item counts
    */
   function updateShoppingListProgressUI(plan, checkedSet) {
-    const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
-      plan.shoppingList ||
-      consolidateShoppingListClient(plan.recipes);
+    const shoppingList = getConsolidatedShoppingList(plan);
     if (!shoppingList) return;
 
     const totalItems = shoppingList.length;
@@ -1042,16 +1286,233 @@
     checkboxes.forEach(c => { c.checked = false; });
 
     updateShoppingListProgressUI(plan, emptySet);
+    if (appState.groceryModeState && appState.groceryModeState.active) {
+      updateGroceryModeStatsAndPills();
+    }
     showToast("Checklist items reset!");
+    syncOfflineChecklistToServer();
+  }
+
+  /**
+   * Fullscreen Grocery Mode Controller Functions (MPA-21)
+   */
+  function handleOpenGroceryMode() {
+    const plan = appState.db.mealPlan;
+    if (!plan) {
+      showToast("No active meal plan to shop for.", true);
+      return;
+    }
+
+    appState.groceryModeState.active = true;
+    const modal = document.getElementById('grocery-mode-modal');
+    if (modal) modal.style.display = 'flex';
+
+    requestWakeLock();
+    renderGroceryModeContent();
+
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function handleCloseGroceryMode() {
+    appState.groceryModeState.active = false;
+    const modal = document.getElementById('grocery-mode-modal');
+    if (modal) modal.style.display = 'none';
+
+    releaseWakeLock();
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.overflow = '';
+    }
+
+    const plan = appState.db.mealPlan;
+    if (plan) {
+      const checkedSet = getStoredShoppingChecklist(plan);
+      updateShoppingListProgressUI(plan, checkedSet);
+    }
+  }
+
+  function handleToggleHideChecked(isChecked) {
+    appState.groceryModeState.hideChecked = !!isChecked;
+    const content = document.getElementById('grocery-mode-content');
+    if (content) {
+      content.classList.toggle('hide-checked', appState.groceryModeState.hideChecked);
+    }
+    const toggle = document.getElementById('grocery-hide-checked-toggle');
+    if (toggle) toggle.checked = appState.groceryModeState.hideChecked;
+  }
+
+  function handleFilterGroceryAisle(category) {
+    appState.groceryModeState.selectedCategory = category || 'all';
+    renderGroceryModeContent();
+  }
+
+  function handleAddCustomGroceryItem(event) {
+    if (event) event.preventDefault();
+    const input = document.getElementById('grocery-add-input');
+    const categorySelect = document.getElementById('grocery-add-category');
+    if (!input) return;
+
+    const name = input.value.trim();
+    if (!name) return;
+    const category = categorySelect ? categorySelect.value : '🥫 Pantry & Canned';
+
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+
+    const customItems = getStoredCustomGroceryItems(plan);
+    customItems.push({
+      name: name,
+      category: category,
+      amount: '1',
+      unit: 'item'
+    });
+    saveStoredCustomGroceryItems(plan, customItems);
+
+    input.value = '';
+    renderGroceryModeContent();
+    const checkedSet = getStoredShoppingChecklist(plan);
+    updateShoppingListProgressUI(plan, checkedSet);
+    showToast(`Added "${name}" to ${category}!`);
+    syncOfflineChecklistToServer();
+  }
+
+  function updateGroceryModeStatsAndPills() {
+    const plan = appState.db.mealPlan;
+    if (!plan) return;
+
+    const shoppingList = getConsolidatedShoppingList(plan);
+    const checkedSet = getStoredShoppingChecklist(plan);
+    const totalItems = shoppingList.length;
+    let totalChecked = 0;
+
+    const categorized = {};
+    AISLE_CATEGORIES.forEach(cat => { categorized[cat] = []; });
+
+    shoppingList.forEach(item => {
+      const cat = item.category || categorizeIngredient(item.name);
+      if (!categorized[cat]) categorized[cat] = [];
+      categorized[cat].push(item);
+      if (checkedSet.has(item.name)) totalChecked++;
+    });
+
+    const progressPct = totalItems > 0 ? Math.round((totalChecked / totalItems) * 100) : 0;
+    const statsEl = document.getElementById('grocery-mode-stats');
+    if (statsEl) {
+      statsEl.textContent = `${totalChecked} of ${totalItems} items checked (${progressPct}% complete)`;
+    }
+
+    const aisleBarEl = document.getElementById('grocery-aisle-bar');
+    if (aisleBarEl) {
+      let pillsHtml = `
+        <button type="button" class="grocery-aisle-pill ${appState.groceryModeState.selectedCategory === 'all' ? 'active' : ''}" 
+                onclick="handleFilterGroceryAisle('all')">
+          <span>🛒 All Items</span>
+          <span class="grocery-aisle-pill-count">${totalItems}</span>
+        </button>
+      `;
+
+      AISLE_CATEGORIES.forEach(cat => {
+        const items = categorized[cat] || [];
+        if (items.length === 0) return;
+        const catChecked = items.filter(it => checkedSet.has(it.name)).length;
+        const isSelected = appState.groceryModeState.selectedCategory === cat;
+        pillsHtml += `
+          <button type="button" class="grocery-aisle-pill ${isSelected ? 'active' : ''}" 
+                  onclick="handleFilterGroceryAisle('${escapeJSString(cat)}')">
+            <span>${escapeHtml(cat)}</span>
+            <span class="grocery-aisle-pill-count">${items.length - catChecked}/${items.length}</span>
+          </button>
+        `;
+      });
+      aisleBarEl.innerHTML = pillsHtml;
+    }
+  }
+
+  function renderGroceryModeContent() {
+    const plan = appState.db.mealPlan;
+    const contentEl = document.getElementById('grocery-mode-content');
+    if (!plan || !contentEl) return;
+
+    const shoppingList = getConsolidatedShoppingList(plan);
+    const checkedSet = getStoredShoppingChecklist(plan);
+
+    // Group items by category
+    const categorized = {};
+    AISLE_CATEGORIES.forEach(cat => { categorized[cat] = []; });
+
+    shoppingList.forEach(item => {
+      const cat = item.category || categorizeIngredient(item.name);
+      if (!categorized[cat]) categorized[cat] = [];
+      categorized[cat].push(item);
+    });
+
+    updateGroceryModeStatsAndPills();
+
+    // Render Categorized Shopping Sections
+    let sectionsHtml = '';
+    AISLE_CATEGORIES.forEach(cat => {
+      if (appState.groceryModeState.selectedCategory !== 'all' && appState.groceryModeState.selectedCategory !== cat) {
+        return;
+      }
+      const items = categorized[cat] || [];
+      if (items.length === 0) return;
+
+      const catCheckedCount = items.filter(it => checkedSet.has(it.name)).length;
+      const catTotal = items.length;
+      const catSlug = escapeHtmlId(cat);
+
+      let itemsHtml = '';
+      items.forEach(item => {
+        const isChecked = checkedSet.has(item.name);
+        const amountsStr = (item.amounts || []).map(a => `${a.amount} ${a.unit}`).join(', ');
+        const itemSlug = escapeHtmlId(item.name);
+
+        itemsHtml += `
+          <div class="shopping-item-row ${isChecked ? 'checked' : ''}" 
+               id="grocery-row-${itemSlug}"
+               onclick="handleToggleShoppingItem(event, '${escapeJSString(item.name)}')">
+            <label class="shopping-checkbox-label" onclick="event.stopPropagation()">
+              <input type="checkbox" class="shopping-item-checkbox" 
+                     id="grocery-check-${itemSlug}" 
+                     ${isChecked ? 'checked' : ''} 
+                     onchange="handleToggleShoppingItemCheckbox('${escapeJSString(item.name)}', this.checked)">
+              <span class="shopping-custom-checkbox"></span>
+            </label>
+            <div class="shopping-item-content">
+              <span class="shopping-item-name">${escapeHtml(item.name)}</span>
+              <span class="shopping-item-amount">${escapeHtml(amountsStr)}</span>
+            </div>
+          </div>
+        `;
+      });
+
+      sectionsHtml += `
+        <div class="shopping-category-card" id="grocery-cat-${catSlug}">
+          <div class="shopping-category-header">
+            <div class="shopping-category-title-group">
+              <span class="shopping-category-name">${escapeHtml(cat)}</span>
+              <span class="shopping-category-count">
+                ${catTotal} ${catTotal === 1 ? 'item' : 'items'} (${catCheckedCount} checked)
+              </span>
+            </div>
+          </div>
+          <div class="shopping-items-list">
+            ${itemsHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    contentEl.innerHTML = sectionsHtml;
+    contentEl.classList.toggle('hide-checked', appState.groceryModeState.hideChecked);
   }
 
   /**
    * Format grocery list as clean plain text / Markdown grouped by aisle
    */
   function formatShoppingListText(plan) {
-    const shoppingList = (plan.executionResult && plan.executionResult.shoppingList) ||
-      plan.shoppingList ||
-      consolidateShoppingListClient(plan.recipes);
+    const shoppingList = getConsolidatedShoppingList(plan);
     if (!shoppingList || shoppingList.length === 0) return '';
 
     const categorized = {};
@@ -1403,6 +1864,8 @@
     `;
       return;
     }
+
+    cacheActivePlanLocally(plan);
 
     // Reset selection set
     appState.selectedRecipes.clear();

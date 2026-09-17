@@ -1392,3 +1392,40 @@ function getRecipeHistory() {
     throw new Error("Failed to load history: " + e.message);
   }
 }
+
+/**
+ * Synchronizes shopping checklist progress and custom in-store grocery items to Drive DB.
+ * Allows seamless persistence from offline queue (MPA-21).
+ */
+function syncShoppingChecklistServer(checkedItems, customItems) {
+  try {
+    var file = getDatabaseFile();
+    var db = JSON.parse(file.getBlob().getDataAsString());
+    
+    if (!db.mealPlan) {
+      db.mealPlan = {};
+    }
+    
+    if (Array.isArray(checkedItems)) {
+      db.mealPlan.checkedItems = checkedItems;
+    }
+    
+    if (Array.isArray(customItems)) {
+      db.mealPlan.customItems = customItems;
+    }
+    
+    db.lastUpdated = new Date().toISOString();
+    file.setContent(JSON.stringify(db, null, 2));
+    
+    return {
+      success: true,
+      timestamp: db.lastUpdated,
+      checkedCount: (db.mealPlan.checkedItems || []).length,
+      customCount: (db.mealPlan.customItems || []).length
+    };
+  } catch (e) {
+    Logger.log("Error syncing shopping checklist: " + e.toString());
+    throw new Error("Failed to sync shopping checklist: " + e.message);
+  }
+}
+

@@ -1309,6 +1309,208 @@ describe('17. Tier 1 Deterministic Prompt Evaluation & Constraint Safety Suite (
   });
 });
 
+// 18. Progressive Web App (PWA) & Offline Grocery Mode (MPA-21)
+describe('18. Progressive Web App (PWA) & Offline Grocery Mode (MPA-21)', () => {
+  test('Index.html defines valid PWA Web Manifest, iOS meta tags, and Network Status badge', () => {
+    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+    assert(indexHtml.includes('<meta name="theme-color" content="#1e222b">'), 'Missing theme-color meta tag');
+    assert(indexHtml.includes('<meta name="apple-mobile-web-app-capable" content="yes">'), 'Missing apple-mobile-web-app-capable tag');
+    assert(indexHtml.includes('<meta name="apple-mobile-web-app-title" content="Meal Planner">'), 'Missing apple-mobile-web-app-title tag');
+    assert(indexHtml.includes('<link rel="manifest"'), 'Missing link rel=manifest tag');
+    assert(indexHtml.includes('id="network-status-pill"'), 'Missing network-status-pill ID');
+    assert(indexHtml.includes('id="network-status-label"'), 'Missing network-status-label ID');
+
+    // Extract manifest JSON from Data URI
+    const manifestMatch = indexHtml.match(/href="data:application\/manifest\+json,([^"]+)"/);
+    assert(manifestMatch, 'Could not extract inline Data URI manifest from Index.html');
+    const decodedManifest = JSON.parse(decodeURIComponent(manifestMatch[1]));
+    assertEqual(decodedManifest.name, 'Meal Planning Assistant');
+    assertEqual(decodedManifest.short_name, 'Meal Planner');
+    assertEqual(decodedManifest.display, 'standalone');
+    assertEqual(decodedManifest.theme_color, '#1e222b');
+    assert(Array.isArray(decodedManifest.icons) && decodedManifest.icons.length > 0, 'Manifest must include icons');
+  });
+
+  test('Index.html defines Fullscreen Grocery Mode Modal, Aisle Bar, and Ad-Hoc Item Form', () => {
+    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
+    assert(indexHtml.includes('id="grocery-mode-modal"'), 'Missing grocery-mode-modal ID');
+    assert(indexHtml.includes('id="grocery-mode-stats"'), 'Missing grocery-mode-stats ID');
+    assert(indexHtml.includes('id="btn-close-grocery-mode"'), 'Missing btn-close-grocery-mode ID');
+    assert(indexHtml.includes('id="grocery-hide-checked-toggle"'), 'Missing grocery-hide-checked-toggle ID');
+    assert(indexHtml.includes('id="grocery-wakelock-badge"'), 'Missing grocery-wakelock-badge ID');
+    assert(indexHtml.includes('id="grocery-aisle-bar"'), 'Missing grocery-aisle-bar ID');
+    assert(indexHtml.includes('id="grocery-mode-content"'), 'Missing grocery-mode-content ID');
+    assert(indexHtml.includes('id="grocery-add-form"'), 'Missing grocery-add-form ID');
+    assert(indexHtml.includes('id="grocery-add-input"'), 'Missing grocery-add-input ID');
+    assert(indexHtml.includes('id="grocery-add-category"'), 'Missing grocery-add-category ID');
+  });
+
+  test('Styles.html defines CSS for Grocery Mode, Aisle Pills, and Network Status indicator', () => {
+    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
+    assert(stylesHtml.includes('.network-status-pill'), 'Missing .network-status-pill styling');
+    assert(stylesHtml.includes('.network-status-pill.online'), 'Missing .network-status-pill.online styling');
+    assert(stylesHtml.includes('.network-status-pill.offline'), 'Missing .network-status-pill.offline styling');
+    assert(stylesHtml.includes('.grocery-mode-modal'), 'Missing .grocery-mode-modal styling');
+    assert(stylesHtml.includes('.grocery-aisle-bar'), 'Missing .grocery-aisle-bar styling');
+    assert(stylesHtml.includes('.grocery-aisle-pill.active'), 'Missing .grocery-aisle-pill.active styling');
+    assert(stylesHtml.includes('.grocery-mode-content.hide-checked'), 'Missing .hide-checked CSS rule');
+    assert(stylesHtml.includes('.grocery-wakelock-badge'), 'Missing .grocery-wakelock-badge styling');
+    assert(stylesHtml.includes('.grocery-add-form'), 'Missing .grocery-add-form styling');
+  });
+
+  test('JavaScript.html client helpers handle Offline Plan Caching, Custom Items, and Grocery Mode', () => {
+    const jsContent = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    const cleanJs = jsContent.replace(/<\/?script>/g, '');
+
+    // Setup Mock DOM & LocalStorage for VM
+    const mockStorage = {};
+    const mockLocalStorage = {
+      getItem: (k) => mockStorage[k] || null,
+      setItem: (k, v) => { mockStorage[k] = String(v); },
+      removeItem: (k) => { delete mockStorage[k]; },
+      clear: () => { Object.keys(mockStorage).forEach(k => delete mockStorage[k]); }
+    };
+
+    const mockDoc = {
+      getElementById: (id) => ({
+        id,
+        classList: {
+          add: () => {},
+          remove: () => {},
+          toggle: () => {},
+          contains: () => false
+        },
+        style: {},
+        value: '',
+        textContent: '',
+        innerHTML: ''
+      }),
+      querySelectorAll: () => [],
+      querySelector: () => null,
+      addEventListener: () => {}
+    };
+
+    const sandbox = {
+      console,
+      localStorage: mockLocalStorage,
+      document: mockDoc,
+      window: {
+        addEventListener: () => {},
+        scrollTo: () => {}
+      },
+      navigator: {
+        onLine: true,
+        wakeLock: {
+          request: async () => ({
+            addEventListener: () => {},
+            release: async () => {}
+          })
+        }
+      },
+      setTimeout: (fn) => fn(),
+      Set,
+      Array,
+      Object,
+      Math,
+      String,
+      JSON,
+      parseInt,
+      parseFloat
+    };
+
+    vm.createContext(sandbox);
+    vm.runInContext(cleanJs, sandbox);
+
+    // 1. Test offline plan caching & restoration
+    const samplePlan = {
+      generatedAt: "2026-09-16T22:00:00.000Z",
+      recipes: [
+        {
+          name: "Crispy Salmon with Asparagus",
+          ingredients: [
+            { name: "salmon fillet", amount: 2, unit: "lbs" },
+            { name: "asparagus", amount: 1, unit: "bunch" }
+          ]
+        }
+      ]
+    };
+
+    sandbox.cacheActivePlanLocally(samplePlan);
+    const cachedStr = mockStorage['mp_active_plan_cache'];
+    assert(cachedStr, 'cacheActivePlanLocally should write to mp_active_plan_cache in localStorage');
+    const parsedCache = JSON.parse(cachedStr);
+    assertEqual(parsedCache.recipes[0].name, "Crispy Salmon with Asparagus");
+
+    // 2. Test custom grocery items addition and consolidation
+    const customItems = [
+      { name: "Organic Honeycrisp Apples", category: "🥬 Produce", amount: "4", unit: "items" },
+      { name: "Unsweetened Almond Milk", category: "🧀 Dairy & Refrigerated", amount: "1", unit: "carton" }
+    ];
+    sandbox.saveStoredCustomGroceryItems(samplePlan, customItems);
+    const loadedCustom = sandbox.getStoredCustomGroceryItems(samplePlan);
+    assertEqual(loadedCustom.length, 2);
+    assertEqual(loadedCustom[0].name, "Organic Honeycrisp Apples");
+
+    const consolidated = sandbox.getConsolidatedShoppingList(samplePlan);
+    assert(consolidated.length >= 4, "Consolidated list should merge recipe ingredients and custom items");
+    assert(consolidated.some(item => item.name === "Organic Honeycrisp Apples"), "Should include custom apples");
+    assert(consolidated.some(item => item.name === "salmon fillet"), "Should include recipe salmon");
+
+    // 3. Test checklist storage key generation
+    const key = sandbox.getShoppingChecklistStorageKey(samplePlan);
+    assertEqual(key.startsWith('mp_checklist_'), true);
+  });
+
+  test('Code.gs syncShoppingChecklistServer persists checked states and custom grocery items to DB', () => {
+    const codeGsContent = fs.readFileSync(path.join(ROOT_DIR, 'Code.gs'), 'utf8');
+
+    let savedDb = null;
+    const mockDb = {
+      preferences: { dinersCount: 4 },
+      mealPlan: {
+        recipes: [{ name: "Tacos" }]
+      }
+    };
+
+    const mockFile = {
+      getBlob: () => ({ getDataAsString: () => JSON.stringify(mockDb) }),
+      setContent: (content) => { savedDb = JSON.parse(content); }
+    };
+
+    const mockDriveApp = {
+      getFilesByName: () => ({
+        hasNext: () => true,
+        next: () => mockFile
+      })
+    };
+
+    const sandbox = {
+      Logger: { log: () => {} },
+      DriveApp: mockDriveApp,
+      DB_FILENAME: "Automated_Meal_Planner_DB.json",
+      getDatabaseFile: () => mockFile,
+      JSON,
+      Date,
+      Array
+    };
+
+    vm.createContext(sandbox);
+    vm.runInContext(codeGsContent, sandbox);
+
+    const checkedItems = ["salmon fillet", "asparagus"];
+    const customItems = [{ name: "Sparkling Water", category: "🥫 Pantry & Canned" }];
+
+    const result = sandbox.syncShoppingChecklistServer(checkedItems, customItems);
+    assertEqual(result.success, true);
+    assertEqual(result.checkedCount, 2);
+    assertEqual(result.customCount, 1);
+    assert(savedDb !== null, "Database content must be updated and saved");
+    assertEqual(savedDb.mealPlan.checkedItems.length, 2);
+    assertEqual(savedDb.mealPlan.customItems[0].name, "Sparkling Water");
+  });
+});
+
+
 // ---------------------------------------------------------
 // Summary Readout & Exit Code Handling
 // ---------------------------------------------------------

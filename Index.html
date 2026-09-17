@@ -7,6 +7,13 @@
   <title>Meal Planning Assistant</title>
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+  <!-- Progressive Web App (PWA) Manifest & Meta (MPA-21) -->
+  <meta name="theme-color" content="#1e222b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Meal Planner">
+  <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f37d.png">
+  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Meal%20Planning%20Assistant%22%2C%22short_name%22%3A%22Meal%20Planner%22%2C%22description%22%3A%22Intelligent%20meal%20planner%20with%20offline%20grocery%20checklist%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%2314171f%22%2C%22theme_color%22%3A%22%231e222b%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Ftwitter%2Ftwemoji%4014.0.2%2Fassets%2F72x72%2F1f37d.png%22%2C%22sizes%22%3A%2272x72%22%2C%22type%22%3A%22image%2Fpng%22%7D%2C%7B%22src%22%3A%22https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Ftwitter%2Ftwemoji%4014.0.2%2Fassets%2F72x72%2F1f37d.png%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
   <!-- Include Premium CSS Stylesheet -->
   <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
 </head>
@@ -21,12 +28,18 @@
         <span class="brand-icon">🍽️</span>
         <h1>Meal Planning Assistant</h1>
       </div>
-      <nav class="nav-desktop">
-        <button class="nav-tab" data-view="planner">🗓️ Planner</button>
-        <button class="nav-tab" data-view="history">📜 History</button>
-        <button class="nav-tab" data-view="preferences">❤️ Preferences</button>
-        <button class="nav-tab" data-view="settings">⚙️ Settings</button>
-      </nav>
+      <div class="header-right-tools">
+        <div class="network-status-pill online" id="network-status-pill" title="Network status: Online">
+          <span class="status-dot"></span>
+          <span class="status-label" id="network-status-label">Online</span>
+        </div>
+        <nav class="nav-desktop">
+          <button class="nav-tab" data-view="planner">🗓️ Planner</button>
+          <button class="nav-tab" data-view="history">📜 History</button>
+          <button class="nav-tab" data-view="preferences">❤️ Preferences</button>
+          <button class="nav-tab" data-view="settings">⚙️ Settings</button>
+        </nav>
+      </div>
     </header>
 
     <!-- Main Content Views -->
@@ -405,6 +418,70 @@
       </div>
 
     </main>
+
+    <!-- FULLSCREEN GROCERY SHOPPING MODE MODAL (MPA-21) -->
+    <div class="grocery-mode-modal" id="grocery-mode-modal" style="display: none;" role="dialog" aria-label="Grocery Shopping Mode">
+      <div class="grocery-mode-container">
+        <!-- Grocery Mode Header -->
+        <div class="grocery-mode-header">
+          <div class="grocery-mode-title-row">
+            <div class="grocery-mode-branding">
+              <span class="grocery-mode-icon">🛒</span>
+              <div>
+                <h2 class="grocery-mode-title">Grocery Shopping Mode</h2>
+                <div class="grocery-mode-stats" id="grocery-mode-stats">0 of 0 items checked (0% complete)</div>
+              </div>
+            </div>
+            <button class="btn btn-secondary grocery-mode-close-btn" id="btn-close-grocery-mode" onclick="handleCloseGroceryMode()">
+              ✕ Done Shopping
+            </button>
+          </div>
+
+          <!-- Utility Toolbar (Wake Lock, Hide Checked, Offline indicator) -->
+          <div class="grocery-mode-toolbar">
+            <div class="grocery-toolbar-left">
+              <label class="grocery-toggle-label" title="Hide items that have already been checked off">
+                <input type="checkbox" id="grocery-hide-checked-toggle" onchange="handleToggleHideChecked(this.checked)">
+                <span class="grocery-custom-switch"></span>
+                <span>👁️ Hide Checked</span>
+              </label>
+              <div class="grocery-wakelock-badge" id="grocery-wakelock-badge" title="Screen stays awake while shopping">
+                <span>☀️ Screen Awake</span>
+              </div>
+            </div>
+            <div class="grocery-toolbar-right">
+              <button class="btn btn-secondary btn-sm" id="btn-copy-grocery-mode" onclick="handleCopyShoppingList()">📋 Copy</button>
+              <button class="btn btn-secondary btn-sm" id="btn-reset-grocery-mode" onclick="handleResetShoppingChecklist()">↺ Reset</button>
+            </div>
+          </div>
+
+          <!-- Sticky Horizontal Aisle Filter Pills -->
+          <div class="grocery-aisle-bar" id="grocery-aisle-bar">
+            <!-- Dynamic Aisle Pills -->
+          </div>
+        </div>
+
+        <!-- Grocery Mode Items List Area -->
+        <div class="grocery-mode-content" id="grocery-mode-content">
+          <!-- Dynamic Categorized Grocery Items -->
+        </div>
+
+        <!-- Grocery Mode Footer: Ad-Hoc Item Addition -->
+        <div class="grocery-mode-footer">
+          <form class="grocery-add-form" id="grocery-add-form" onsubmit="handleAddCustomGroceryItem(event)">
+            <input type="text" class="grocery-add-input" id="grocery-add-input" placeholder="➕ Add in-store item (e.g., Oat milk, Paper towels)..." autocomplete="off" />
+            <select class="grocery-add-select" id="grocery-add-category">
+              <option value="🥬 Produce">🥬 Produce</option>
+              <option value="🥩 Meat & Seafood">🥩 Meat</option>
+              <option value="🧀 Dairy & Refrigerated">🧀 Dairy</option>
+              <option value="🥫 Pantry & Canned" selected>🥫 Pantry</option>
+              <option value="🧂 Spices & Baking">🧂 Spices</option>
+            </select>
+            <button type="submit" class="btn btn-sm grocery-add-btn">Add</button>
+          </form>
+        </div>
+      </div>
+    </div>
 
     <!-- STICKY BOTTOM NAVIGATION (MOBILE) -->
     <nav class="bottom-nav" id="bottom-nav" aria-label="Mobile Navigation">
