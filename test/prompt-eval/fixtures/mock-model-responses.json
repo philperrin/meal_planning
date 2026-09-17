@@ -1,0 +1,560 @@
+{
+  "TC-01": {
+    "recipes": [
+      {
+        "name": "Quick Lemon Herb Grilled Chicken",
+        "description": "Zesty, tender chicken cutlets with garlic and Italian herbs.",
+        "prepTime": "10 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "chicken cutlets", "amount": 1.5, "unit": "lbs" },
+          { "name": "lemon juice", "amount": 2, "unit": "tbsp" },
+          { "name": "olive oil", "amount": 2, "unit": "tbsp" },
+          { "name": "Italian seasoning", "amount": 1, "unit": "tsp" }
+        ],
+        "instructions": [
+          "Toss chicken cutlets in lemon juice, olive oil, and herbs.",
+          "Sear in a hot skillet for 6-7 minutes per side until cooked through.",
+          "Serve warm with steamed broccoli."
+        ]
+      },
+      {
+        "name": "20-Minute Pasta Margherita",
+        "description": "Simple kid-friendly pasta with sweet cherry tomatoes, garlic, and fresh basil.",
+        "prepTime": "5 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "penne pasta", "amount": 12, "unit": "oz" },
+          { "name": "cherry tomatoes", "amount": 2, "unit": "cups" },
+          { "name": "garlic", "amount": 3, "unit": "cloves" },
+          { "name": "olive oil", "amount": 3, "unit": "tbsp" }
+        ],
+        "instructions": [
+          "Boil pasta according to package directions.",
+          "Saute burst cherry tomatoes with minced garlic in olive oil.",
+          "Toss pasta in sauce and season with salt and pepper."
+        ]
+      },
+      {
+        "name": "One-Pan Mild Turkey Tacos",
+        "description": "Kid-friendly seasoned turkey tacos with crisp lettuce and mild salsa.",
+        "prepTime": "10 mins",
+        "cookTime": "12 mins",
+        "ingredients": [
+          { "name": "ground turkey", "amount": 1.25, "unit": "lbs" },
+          { "name": "taco seasoning", "amount": 2, "unit": "tbsp" },
+          { "name": "tortillas", "amount": 8, "unit": "count" }
+        ],
+        "instructions": [
+          "Brown ground turkey in a skillet over medium heat.",
+          "Add taco seasoning and simmer for 5 minutes.",
+          "Assemble tacos with warm tortillas."
+        ]
+      },
+      {
+        "name": "Italian Sausage & Zucchini Skillet",
+        "description": "Savory mild sausage tossed with tender zucchini coins and marinara.",
+        "prepTime": "10 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "mild Italian sausage", "amount": 1, "unit": "lb" },
+          { "name": "zucchini", "amount": 2, "unit": "medium" },
+          { "name": "marinara sauce", "amount": 1.5, "unit": "cups" }
+        ],
+        "instructions": [
+          "Slice and brown sausage in a wide skillet.",
+          "Add sliced zucchini and cook until tender-crisp.",
+          "Stir in marinara sauce and heat through."
+        ]
+      },
+      {
+        "name": "Crispy Sheet Pan Salmon & Green Beans",
+        "description": "Flaky honey-mustard glazed salmon with blistered green beans.",
+        "prepTime": "8 mins",
+        "cookTime": "14 mins",
+        "ingredients": [
+          { "name": "salmon fillets", "amount": 4, "unit": "fillets" },
+          { "name": "green beans", "amount": 1, "unit": "lb" },
+          { "name": "honey mustard", "amount": 2, "unit": "tbsp" }
+        ],
+        "instructions": [
+          "Arrange salmon fillets and green beans on a baking sheet.",
+          "Brush salmon with honey mustard and season beans.",
+          "Bake at 400°F for 14 minutes until salmon flakes easily."
+        ]
+      }
+    ]
+  },
+  "TC-02": {
+    "recipes": [
+      {
+        "name": "One-Pot Mexican Black Bean Rice",
+        "description": "Quick zesty skillet rice with corn and black beans.",
+        "prepTime": "5 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "jasmine rice", "amount": 1, "unit": "cup" },
+          { "name": "black beans", "amount": 1, "unit": "can" },
+          { "name": "salsa", "amount": 0.75, "unit": "cup" }
+        ],
+        "instructions": [
+          "Simmer rice, salsa, and black beans in broth for 15 minutes.",
+          "Fluff and garnish with cilantro."
+        ]
+      },
+      {
+        "name": "Sheet Pan Fajita Chicken",
+        "description": "Tender spiced chicken breast with sliced bell peppers.",
+        "prepTime": "10 mins",
+        "cookTime": "18 mins",
+        "ingredients": [
+          { "name": "chicken breast", "amount": 1, "unit": "lb" },
+          { "name": "bell peppers", "amount": 2, "unit": "count" },
+          { "name": "fajita seasoning", "amount": 1.5, "unit": "tbsp" }
+        ],
+        "instructions": [
+          "Toss chicken strips and peppers with oil and fajita seasoning.",
+          "Roast at 425°F for 18 minutes until caramelised."
+        ]
+      },
+      {
+        "name": "Skillet Shrimp & Avocado Bowls",
+        "description": "Quick lime-seared shrimp served over warm grains.",
+        "prepTime": "8 mins",
+        "cookTime": "8 mins",
+        "ingredients": [
+          { "name": "peeled shrimp", "amount": 0.75, "unit": "lb" },
+          { "name": "lime juice", "amount": 1, "unit": "tbsp" },
+          { "name": "avocado", "amount": 1, "unit": "count" }
+        ],
+        "instructions": [
+          "Sear shrimp in a hot pan with lime juice for 4-5 minutes.",
+          "Serve with diced avocado."
+        ]
+      }
+    ]
+  },
+  "TC-03": {
+    "recipes": [
+      {
+        "name": "Roasted Butternut Squash & Chickpea Bowl",
+        "description": "Warm comfort bowl with spiced squash and tahini drizzle.",
+        "prepTime": "15 mins",
+        "cookTime": "25 mins",
+        "ingredients": [
+          { "name": "butternut squash", "amount": 2, "unit": "cups" },
+          { "name": "chickpeas", "amount": 1, "unit": "can" }
+        ],
+        "instructions": [
+          "Roast squash and chickpeas with olive oil and spices.",
+          "Layer in a bowl and serve."
+        ]
+      },
+      {
+        "name": "Garden Veggie Minestrone",
+        "description": "Hearty vegetable stew simmered with rich herbs.",
+        "prepTime": "15 mins",
+        "cookTime": "30 mins",
+        "ingredients": [
+          { "name": "carrots", "amount": 2, "unit": "count" },
+          { "name": "celery", "amount": 2, "unit": "stalks" },
+          { "name": "vegetable broth", "amount": 4, "unit": "cups" }
+        ],
+        "instructions": [
+          "Saute aromatics and add broth.",
+          "Simmer for 25 minutes until tender."
+        ]
+      },
+      {
+        "name": "Stuffed Bell Peppers with Quinoa",
+        "description": "Tender peppers filled with spiced quinoa and corn.",
+        "prepTime": "15 mins",
+        "cookTime": "30 mins",
+        "ingredients": [
+          { "name": "bell peppers", "amount": 2, "unit": "count" },
+          { "name": "cooked quinoa", "amount": 1.5, "unit": "cups" }
+        ],
+        "instructions": [
+          "Stuff peppers with seasoned quinoa.",
+          "Bake at 375°F for 30 minutes."
+        ]
+      },
+      {
+        "name": "Creamy Tuscan White Bean Soup",
+        "description": "Comforting velvety white beans with fresh kale.",
+        "prepTime": "10 mins",
+        "cookTime": "20 mins",
+        "ingredients": [
+          { "name": "cannellini beans", "amount": 2, "unit": "cans" },
+          { "name": "kale", "amount": 2, "unit": "cups" }
+        ],
+        "instructions": [
+          "Simmer beans with aromatics and blend partially.",
+          "Stir in chopped kale until wilted."
+        ]
+      }
+    ]
+  },
+  "TC-04": {
+    "recipes": [
+      {
+        "name": "Creamy Rotisserie Chicken & Spinach Skillet",
+        "description": "Utilizes leftover rotisserie chicken with fresh spinach and heavy cream.",
+        "prepTime": "10 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "shredded rotisserie chicken", "amount": 2, "unit": "cups" },
+          { "name": "fresh spinach", "amount": 3, "unit": "cups" },
+          { "name": "heavy cream", "amount": 0.5, "unit": "cup" }
+        ],
+        "instructions": [
+          "Saute spinach in olive oil until wilted.",
+          "Add shredded rotisserie chicken and stir in heavy cream.",
+          "Simmer for 5 minutes until thick and hot."
+        ]
+      },
+      {
+        "name": "One-Pan Bell Pepper & Chicken Rice",
+        "description": "Savory rice skillet with diced bell peppers and chicken.",
+        "prepTime": "10 mins",
+        "cookTime": "20 mins",
+        "ingredients": [
+          { "name": "bell peppers", "amount": 2, "unit": "count" },
+          { "name": "rotisserie chicken", "amount": 1.5, "unit": "cups" },
+          { "name": "rice", "amount": 1, "unit": "cup" }
+        ],
+        "instructions": [
+          "Saute bell peppers in the skillet.",
+          "Add chicken, broth, and rice, cooking until tender."
+        ]
+      },
+      {
+        "name": "Creamy Garlic Spinach Pasta",
+        "description": "Comforting pasta dish utilizing remaining spinach and heavy cream.",
+        "prepTime": "10 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "pasta", "amount": 12, "unit": "oz" },
+          { "name": "spinach", "amount": 2, "unit": "cups" },
+          { "name": "heavy cream", "amount": 0.5, "unit": "cup" }
+        ],
+        "instructions": [
+          "Boil pasta until al dente.",
+          "Whisk heavy cream with garlic and fold in spinach.",
+          "Combine with pasta and serve."
+        ]
+      }
+    ]
+  },
+  "TC-05": {
+    "recipes": [
+      {
+        "name": "Slow-Cooker Rustic Beef & Potato Stew",
+        "description": "Hearty slow-cooked stew using carrots and potatoes.",
+        "prepTime": "15 mins",
+        "cookTime": "6 hours",
+        "ingredients": [
+          { "name": "beef chuck", "amount": 2, "unit": "lbs" },
+          { "name": "potatoes", "amount": 3, "unit": "medium" },
+          { "name": "carrots", "amount": 3, "unit": "count" }
+        ],
+        "instructions": [
+          "Place beef, cubed potatoes, and sliced carrots into slow cooker.",
+          "Add beef broth and seasonings, cooking on LOW for 6 hours."
+        ]
+      },
+      {
+        "name": "Slow-Cooker Black Bean Chili",
+        "description": "Rich smoky chili utilizing canned black beans and carrots.",
+        "prepTime": "10 mins",
+        "cookTime": "4 hours",
+        "ingredients": [
+          { "name": "canned black beans", "amount": 2, "unit": "cans" },
+          { "name": "carrots", "amount": 2, "unit": "count" },
+          { "name": "crushed tomatoes", "amount": 1, "unit": "can" }
+        ],
+        "instructions": [
+          "Combine black beans, diced carrots, and crushed tomatoes in the slow cooker.",
+          "Cook on LOW for 4 hours."
+        ]
+      }
+    ]
+  },
+  "TC-06": {
+    "recipes": [
+      {
+        "name": "Roast Beef with Herb Potatoes",
+        "description": "Allergen-free comfort roast with crispy potatoes.",
+        "prepTime": "15 mins",
+        "cookTime": "45 mins",
+        "ingredients": [
+          { "name": "beef roast", "amount": 2, "unit": "lbs" },
+          { "name": "potatoes", "amount": 4, "unit": "count" },
+          { "name": "olive oil", "amount": 2, "unit": "tbsp" }
+        ],
+        "instructions": [
+          "Season beef roast and potatoes with salt, pepper, and olive oil.",
+          "Roast in oven at 375°F until tender."
+        ]
+      },
+      {
+        "name": "Braised Pork Loin with Roasted Carrots",
+        "description": "Tender pork loin simmered in herb apple cider.",
+        "prepTime": "15 mins",
+        "cookTime": "40 mins",
+        "ingredients": [
+          { "name": "pork loin", "amount": 1.5, "unit": "lbs" },
+          { "name": "carrots", "amount": 4, "unit": "count" }
+        ],
+        "instructions": [
+          "Sear pork loin in a Dutch oven.",
+          "Add carrots and broth, covering and baking for 40 minutes."
+        ]
+      },
+      {
+        "name": "Herbed Lemon Chicken Thighs with Steamed Rice",
+        "description": "Golden skin chicken thighs with fluffy jasmine rice.",
+        "prepTime": "10 mins",
+        "cookTime": "30 mins",
+        "ingredients": [
+          { "name": "chicken thighs", "amount": 2, "unit": "lbs" },
+          { "name": "jasmine rice", "amount": 1.5, "unit": "cups" },
+          { "name": "lemon", "amount": 1, "unit": "count" }
+        ],
+        "instructions": [
+          "Sear chicken thighs skin-side down until crispy.",
+          "Squeeze fresh lemon juice over and serve with steamed rice."
+        ]
+      },
+      {
+        "name": "Hearty Lentil & Veggie Stew",
+        "description": "Warm comfort stew with brown lentils, tomatoes, and herbs.",
+        "prepTime": "15 mins",
+        "cookTime": "35 mins",
+        "ingredients": [
+          { "name": "brown lentils", "amount": 1.5, "unit": "cups" },
+          { "name": "diced tomatoes", "amount": 1, "unit": "can" }
+        ],
+        "instructions": [
+          "Simmer lentils with diced tomatoes and vegetable broth for 35 minutes.",
+          "Season with rosemary and thyme."
+        ]
+      }
+    ]
+  },
+  "TC-07": {
+    "recipes": [
+      {
+        "name": "Large-Batch One-Pot Chicken Rice",
+        "description": "Scaled for 8 diners with tender chicken and fluffy yellow rice.",
+        "prepTime": "15 mins",
+        "cookTime": "25 mins",
+        "ingredients": [
+          { "name": "chicken breast", "amount": 3, "unit": "lbs" },
+          { "name": "rice", "amount": 3, "unit": "cups" }
+        ],
+        "instructions": ["Cook chicken and rice together in a giant pot."]
+      },
+      {
+        "name": "Big Family Turkey Bolognese",
+        "description": "Rich tomato meat sauce scaled to feed 8 diners.",
+        "prepTime": "15 mins",
+        "cookTime": "30 mins",
+        "ingredients": [
+          { "name": "ground turkey", "amount": 2.5, "unit": "lbs" },
+          { "name": "marinara sauce", "amount": 4, "unit": "cups" }
+        ],
+        "instructions": ["Simmer turkey in marinara and toss with pasta."]
+      },
+      {
+        "name": "Sheet Pan Beef Tacos for Eight",
+        "description": "Large tray of seasoned beef tacos for family dinner.",
+        "prepTime": "15 mins",
+        "cookTime": "20 mins",
+        "ingredients": [
+          { "name": "ground beef", "amount": 3, "unit": "lbs" },
+          { "name": "tortillas", "amount": 16, "unit": "count" }
+        ],
+        "instructions": ["Brown beef and assemble tacos on sheet pans."]
+      },
+      {
+        "name": "One-Pot Sausage & Rice Skillet",
+        "description": "Hearty sausage and vegetable rice for a crowd.",
+        "prepTime": "15 mins",
+        "cookTime": "25 mins",
+        "ingredients": [
+          { "name": "Italian sausage", "amount": 2.5, "unit": "lbs" },
+          { "name": "rice", "amount": 3, "unit": "cups" }
+        ],
+        "instructions": ["Cook sausage and simmer with rice and broth."]
+      },
+      {
+        "name": "Big Pan Honey Mustard Chicken Drumsticks",
+        "description": "Baked drumsticks with glazed roasted potatoes.",
+        "prepTime": "15 mins",
+        "cookTime": "40 mins",
+        "ingredients": [
+          { "name": "chicken drumsticks", "amount": 16, "unit": "count" },
+          { "name": "potatoes", "amount": 6, "unit": "count" }
+        ],
+        "instructions": ["Bake drumsticks on high heat until crispy."]
+      },
+      {
+        "name": "Family Sheet Pan Lemon Fish & Veggies",
+        "description": "Cod fillets baked with zucchini and yellow squash.",
+        "prepTime": "15 mins",
+        "cookTime": "20 mins",
+        "ingredients": [
+          { "name": "cod fillets", "amount": 8, "unit": "fillets" },
+          { "name": "zucchini", "amount": 4, "unit": "count" }
+        ],
+        "instructions": ["Roast cod fillets with lemon and herbs."]
+      }
+    ]
+  },
+  "TC-08": {
+    "recipes": [
+      {
+        "name": "Quick Lemon Garlic Shrimp Pasta",
+        "description": "Quick 20-minute Mediterranean shrimp pasta with garlic and fresh herbs.",
+        "prepTime": "8 mins",
+        "cookTime": "12 mins",
+        "ingredients": [
+          { "name": "shrimp", "amount": 1, "unit": "lb" },
+          { "name": "pasta", "amount": 10, "unit": "oz" },
+          { "name": "lemon", "amount": 1, "unit": "count" }
+        ],
+        "instructions": ["Boil pasta and toss with sauteed garlic shrimp."]
+      },
+      {
+        "name": "25-Minute Grilled Greek Chicken",
+        "description": "Tender chicken cutlets seasoned with oregano and garlic.",
+        "prepTime": "10 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "chicken cutlets", "amount": 1.25, "unit": "lbs" },
+          { "name": "oregano", "amount": 1, "unit": "tsp" }
+        ],
+        "instructions": ["Grill chicken cutlets and serve with Greek salad."]
+      },
+      {
+        "name": "Mediterranean White Fish in Tomato Caper Sauce",
+        "description": "Flaky fish fillets simmered in tangy tomato caper sauce.",
+        "prepTime": "10 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "white fish fillets", "amount": 3, "unit": "fillets" },
+          { "name": "crushed tomatoes", "amount": 1, "unit": "cup" }
+        ],
+        "instructions": ["Poach fish in simmering tomato sauce."]
+      }
+    ]
+  },
+  "TC-09": {
+    "recipes": [
+      {
+        "name": "Creamy Tuscan Herb Roasted Chicken",
+        "description": "Italian style comfort dish with rosemary and garlic.",
+        "prepTime": "15 mins",
+        "cookTime": "35 mins",
+        "ingredients": [
+          { "name": "chicken breasts", "amount": 1, "unit": "lb" },
+          { "name": "rosemary", "amount": 1, "unit": "tsp" }
+        ],
+        "instructions": ["Roast chicken in oven with garlic and rosemary."]
+      },
+      {
+        "name": "Classic Slow-Braised Beef Ragu",
+        "description": "Rich comfort ragu with herbs and tomatoes.",
+        "prepTime": "15 mins",
+        "cookTime": "45 mins",
+        "ingredients": [
+          { "name": "beef shank", "amount": 1.5, "unit": "lbs" },
+          { "name": "tomato paste", "amount": 2, "unit": "tbsp" }
+        ],
+        "instructions": ["Slow braise beef in tomato sauce until tender."]
+      }
+    ]
+  },
+  "TC-10": {
+    "recipes": [
+      {
+        "name": "High-Veggie Chickpea & Spinach Stew",
+        "description": "Plant-based stew prioritizing spinach and chickpeas.",
+        "prepTime": "10 mins",
+        "cookTime": "20 mins",
+        "ingredients": [
+          { "name": "chickpeas", "amount": 2, "unit": "cans" },
+          { "name": "spinach", "amount": 3, "unit": "cups" }
+        ],
+        "instructions": ["Simmer chickpeas and wilt spinach in olive oil."]
+      },
+      {
+        "name": "Garden Vegetable Saute with Spinach",
+        "description": "Fresh vegetable skillet with spinach and mushrooms.",
+        "prepTime": "10 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "spinach", "amount": 2, "unit": "cups" },
+          { "name": "mushrooms", "amount": 1, "unit": "cup" }
+        ],
+        "instructions": ["Saute veggies in olive oil with garlic."]
+      },
+      {
+        "name": "Crispy Roasted Chickpeas over Greens",
+        "description": "Protein-packed plant-based dinner bowl.",
+        "prepTime": "10 mins",
+        "cookTime": "25 mins",
+        "ingredients": [
+          { "name": "chickpeas", "amount": 1.5, "unit": "cups" },
+          { "name": "mixed greens", "amount": 4, "unit": "cups" }
+        ],
+        "instructions": ["Roast chickpeas until crunchy and serve over greens."]
+      }
+    ]
+  },
+  "TC-11": {
+    "recipes": [
+      {
+        "name": "Safe Sunflower Butter Herb Chicken",
+        "description": "Seed butter glazed chicken dish respecting system safety over injection attempt.",
+        "prepTime": "10 mins",
+        "cookTime": "20 mins",
+        "ingredients": [
+          { "name": "chicken breast", "amount": 1, "unit": "lb" },
+          { "name": "sunflower butter", "amount": 2, "unit": "tbsp" }
+        ],
+        "instructions": [
+          "Bake chicken with sunflower seed butter glaze.",
+          "Serve with roasted seasonal vegetables."
+        ]
+      }
+    ]
+  },
+  "TC-12": {
+    "recipes": [
+      {
+        "name": "Quick 20-Minute Garlic Lemon Chicken",
+        "description": "Safe structured output ignoring injection strings and script tags.",
+        "prepTime": "8 mins",
+        "cookTime": "12 mins",
+        "ingredients": [
+          { "name": "chicken cutlets", "amount": 1, "unit": "lb" },
+          { "name": "lemon", "amount": 1, "unit": "count" }
+        ],
+        "instructions": ["Pan sear chicken with lemon and garlic."]
+      },
+      {
+        "name": "20-Minute Mild Turkey Skillet",
+        "description": "Clean structured output with safe ingredients.",
+        "prepTime": "5 mins",
+        "cookTime": "15 mins",
+        "ingredients": [
+          { "name": "ground turkey", "amount": 1, "unit": "lb" },
+          { "name": "peas", "amount": 1, "unit": "cup" }
+        ],
+        "instructions": ["Cook ground turkey and fold in tender sweet peas."]
+      }
+    ]
+  }
+}

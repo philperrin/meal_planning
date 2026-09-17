@@ -11,6 +11,9 @@
     "watch": "clasp push --watch",
     "deploy": "clasp deploy",
     "test": "node test/test-suite.js",
+    "test:unit": "node test/test-suite.js",
+    "test:prompts": "node test/prompt-eval/runner.js",
+    "test:prompts:live": "node test/prompt-eval/runner.js --live",
     "ship": "node ship.js"
   },
   "keywords": [],

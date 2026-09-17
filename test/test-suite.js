@@ -1183,6 +1183,132 @@ describe("16. 'Clean Out the Fridge' / Pantry Priority Ingredients Input (MPA-12
   });
 });
 
+// 17. Tier 1 Deterministic Prompt Evaluation & Constraint Safety Suite (MPA-20)
+describe('17. Tier 1 Deterministic Prompt Evaluation & Constraint Safety Suite (MPA-20)', () => {
+  const Tier1PromptValidator = require('./prompt-eval/tier1-validator');
+  const allergenDict = JSON.parse(fs.readFileSync(path.join(__dirname, 'prompt-eval', 'allergen-dictionary.json'), 'utf8'));
+  const schemaDef = JSON.parse(fs.readFileSync(path.join(__dirname, 'prompt-eval', 'fixtures', 'schema-definition.json'), 'utf8'));
+  const scenarios = JSON.parse(fs.readFileSync(path.join(__dirname, 'prompt-eval', 'scenarios.json'), 'utf8'));
+  const mockResponses = JSON.parse(fs.readFileSync(path.join(__dirname, 'prompt-eval', 'fixtures', 'mock-model-responses.json'), 'utf8'));
+
+  const validator = new Tier1PromptValidator(allergenDict, schemaDef);
+
+  test('Tier 1 Validator enforces schema structure, required fields, and array types', () => {
+    // Valid recipe
+    const validRecipe = {
+      name: "Herb Chicken",
+      description: "Tender chicken cutlets",
+      prepTime: "10 mins",
+      cookTime: "15 mins",
+      ingredients: [{ name: "chicken", amount: 1, unit: "lb" }],
+      instructions: ["Cook chicken in pan."]
+    };
+    const validRes = validator.evaluateSingleRecipe(validRecipe, {});
+    assertEqual(validRes.pass, true);
+    assertEqual(validRes.schemaValid, true);
+
+    // Missing description and invalid ingredients
+    const invalidRecipe = {
+      name: "Broken Recipe",
+      prepTime: "10 mins",
+      cookTime: "15 mins",
+      ingredients: "not-an-array",
+      instructions: []
+    };
+    const invalidRes = validator.evaluateSingleRecipe(invalidRecipe, {});
+    assertEqual(invalidRes.pass, false);
+    assertEqual(invalidRes.schemaValid, false);
+    assert(invalidRes.violations.some(v => v.includes("Missing required fields")), "Missing required field error");
+  });
+
+  test('Tier 1 Validator P0 Gate intercepts allergens and culinary derivatives', () => {
+    // Direct peanut inclusion
+    const peanutRecipe = {
+      name: "Thai Noodle Bowl with Crushed Peanuts",
+      description: "Tasty noodles",
+      prepTime: "10 mins",
+      cookTime: "10 mins",
+      ingredients: [{ name: "peanuts", amount: 0.25, unit: "cup" }],
+      instructions: ["Garnish with crushed peanuts."]
+    };
+    const res1 = validator.evaluateSingleRecipe(peanutRecipe, { allergies: ["peanuts"] });
+    assertEqual(res1.pass, false);
+    assertEqual(res1.allergenClean, false);
+    assert(res1.violations.some(v => v.includes("P0 Allergen Violation")), "Should flag peanut violation");
+
+    // Derivative allergen (tamari/soy sauce for soy allergy)
+    const soyDerivativeRecipe = {
+      name: "Teriyaki Salmon",
+      description: "Glazed salmon",
+      prepTime: "5 mins",
+      cookTime: "10 mins",
+      ingredients: [{ name: "tamari sauce", amount: 2, unit: "tbsp" }],
+      instructions: ["Baste with sauce."]
+    };
+    const res2 = validator.evaluateSingleRecipe(soyDerivativeRecipe, { allergies: ["soy"] });
+    assertEqual(res2.pass, false);
+    assertEqual(res2.allergenClean, false);
+    assert(res2.violations.some(v => v.includes("P0 Allergen Violation")), "Should flag tamari as soy derivative");
+  });
+
+  test('Tier 1 Validator P0 Gate intercepts avoided cuisine markers', () => {
+    const indianRecipe = {
+      name: "Chicken Tikka Masala with Basmati Rice",
+      description: "Classic Indian curry dish with aromatic spices",
+      prepTime: "15 mins",
+      cookTime: "25 mins",
+      ingredients: [{ name: "garam masala", amount: 1, unit: "tsp" }],
+      instructions: ["Simmer chicken in curry."]
+    };
+    const res = validator.evaluateSingleRecipe(indianRecipe, { avoidedCuisines: ["Indian"] });
+    assertEqual(res.pass, false);
+    assertEqual(res.avoidedCuisineClean, false);
+    assert(res.violations.some(v => v.includes("P0 Cuisine Violation")), "Should flag avoided Indian cuisine");
+  });
+
+  test('Tier 1 Validator P1 enforces time bounds (<=30 mins for quick tag)', () => {
+    const slowRecipe = {
+      name: "Slow Braised Short Ribs",
+      description: "Tender ribs",
+      prepTime: "20 mins",
+      cookTime: "45 mins",
+      ingredients: [{ name: "short ribs", amount: 2, unit: "lbs" }],
+      instructions: ["Braise in Dutch oven."]
+    };
+    const slowRes = validator.evaluateSingleRecipe(slowRecipe, { tags: ["quick"] });
+    assertEqual(slowRes.pass, false);
+    assertEqual(slowRes.quickTimeCompliant, false);
+    assert(slowRes.violations.some(v => v.includes("P1 Time Violation")), "Should flag >30m total time for quick tag");
+
+    const fastRecipe = {
+      name: "Speedy 15-Minute Stir Fry",
+      description: "Quick dinner",
+      prepTime: "5 mins",
+      cookTime: "10 mins",
+      ingredients: [{ name: "tofu", amount: 1, unit: "block" }],
+      instructions: ["Flash fry in wok."]
+    };
+    const fastRes = validator.evaluateSingleRecipe(fastRecipe, { tags: ["quick"] });
+    assertEqual(fastRes.pass, true);
+    assertEqual(fastRes.quickTimeCompliant, true);
+  });
+
+  test('Tier 1 Validator evaluates all defined benchmark scenarios', () => {
+    assert(scenarios.length >= 10, "Should have at least 10 benchmark scenarios");
+    let allPassed = true;
+    scenarios.forEach(sc => {
+      const mockPayload = mockResponses[sc.id];
+      assert(mockPayload, `Missing mock response fixture for scenario ${sc.id}`);
+      const rep = validator.evaluatePlan(mockPayload, sc);
+      if (!rep.pass) {
+        allPassed = false;
+        throw new Error(`Scenario ${sc.id} failed: ${rep.violations.join('; ')}`);
+      }
+    });
+    assertEqual(allPassed, true);
+  });
+});
+
 // ---------------------------------------------------------
 // Summary Readout & Exit Code Handling
 // ---------------------------------------------------------

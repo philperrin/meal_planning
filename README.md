@@ -217,6 +217,29 @@ npm run watch    # Watch mode: auto-push on file changes
 npm run deploy   # Create a new versioned deployment in Apps Script
 ```
 
+### 🧪 Automated Testing & Prompt Evaluation Suite
+
+The repository includes a consolidated headless test runner and a deterministic **Tier 1 Prompt Evaluation Test Harness** to guard against prompt regressions, safety hazards, and schema drift.
+
+```bash
+# Run all 17 consolidated test suites (DOM, CSS, Backend, DB, & Tier 1 Prompt Eval)
+npm test
+
+# Run the dedicated Tier 1 Deterministic Prompt Evaluation benchmark suite (mocked)
+npm run test:prompts
+
+# Run live prompt evaluation against the Gemini API (requires GEMINI_API_KEY)
+npm run test:prompts:live
+```
+
+#### What the Tier 1 Prompt Evaluation Suite validates:
+1. **JSON Schema Integrity (100% Target):** Enforces complete recipe contracts (`name`, `description`, `prepTime`, `cookTime`, `ingredients`, `instructions`).
+2. **Hard Allergen Scanning (P0 Zero-Tolerance Gate):** Regex scans ingredients and instructions against a dictionary of allergens and derivatives (e.g., soy sauce, tamari, almond flour).
+3. **Avoided Cuisine Absence (P0 Gate):** Guarantees zero contamination from avoided cuisines.
+4. **Time Duration Bounds:** Confirms $\text{total preparation and cooking time} \le 30$ minutes when the `quick` tag (`⚡ Under 30 Mins`) is active.
+5. **Pantry Ingredient Utilization:** Verifies on-hand fridge ingredients are prioritized in the initial meal plan dishes.
+6. **Prompt Injection Boundary Isolation:** Confirms freeform user notes (`planPreferences`) cannot override system safety directives.
+
 ### 🚀 Deployment & Release Workflow (All-in-One)
 
 After staging and committing your code changes locally via Git, you can push to GitHub, sync to Google Apps Script, and create a new Apps Script deployment all in one command:
