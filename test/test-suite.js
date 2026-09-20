@@ -80,7 +80,7 @@ function assertDeepEqual(actual, expected, message) {
 // ---------------------------------------------------------
 // Mock Google Apps Script Environment Factory
 // ---------------------------------------------------------
-function createMockGasContext(initialDb, initialUserProps = {}, initialScriptProps = {}, mockRecipeFiles = []) {
+function createMockGasContext(initialDb, initialUserProps = {}, initialScriptProps = {}, mockRecipeFiles = [], customFetch = null) {
   let dbState = JSON.parse(JSON.stringify(initialDb || {
     preferences: {
       allergies: "No eggs.",
@@ -129,6 +129,10 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
     Set: Set,
     Logger: {
       log: () => {}
+    },
+    Utilities: {
+      sleep: () => {},
+      formatDate: (date) => (date instanceof Date ? date.toISOString() : new Date().toISOString())
     },
     PropertiesService: {
       getUserProperties: () => ({
@@ -230,6 +234,9 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
     },
     UrlFetchApp: {
       fetch: (url, options) => {
+        if (customFetch) {
+          return customFetch(url, options, sandbox);
+        }
         let payload = null;
         try {
           if (options && options.payload) {
@@ -856,6 +863,97 @@ describe('9. Meal Plan Generation with Recipe Reuse (MPA-8)', () => {
     assertEqual(plan2.recipes.length, 2, 'Plan should contain 2 recipes');
     assertEqual(plan2.recipes[0].name, "Favorite Pasta", 'First recipe should be reused');
     assertEqual(plan2.recipes[1].name, "Mock Recipe", 'Second recipe should be generated from Gemini');
+  });
+
+  test('generateMealPlanServer() transparently retries on transient 503 and falls back to gemini-2.5-flash', () => {
+    const db = {
+      preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
+      mealPlan: null,
+      recipeRatings: {},
+      recipeLibrary: {},
+      lastUpdated: new Date().toISOString()
+    };
+    const userProps = { GEMINI_API_KEY: "mock-key" };
+
+    // Case A: 503 on first attempt, 200 on retry (same model)
+    let callCountA = 0;
+    const mockFetchWithTransient503 = (url, options) => {
+      callCountA++;
+      if (callCountA === 1) {
+        return {
+          getResponseCode: () => 503,
+          getContentText: () => JSON.stringify({ error: { code: 503, message: "High demand" } })
+        };
+      }
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({
+          candidates: [{
+            content: {
+              parts: [{
+                text: JSON.stringify({
+                  recipes: [{
+                    name: "Recovered Salmon",
+                    description: "Tasty recovered dish",
+                    prepTime: "15 mins",
+                    cookTime: "20 mins",
+                    ingredients: [{ name: "salmon", amount: 2, unit: "fillets" }],
+                    instructions: ["Cook and serve."]
+                  }]
+                })
+              }]
+            }
+          }]
+        })
+      };
+    };
+
+    const contextA = createMockGasContext(db, userProps, {}, [], mockFetchWithTransient503);
+    const resA = contextA.generateMealPlanServer(1, "");
+    assertEqual(resA.success, true, 'Generation should succeed after retry');
+    assertEqual(callCountA, 2, 'Should have retried once after 503');
+    assertEqual(resA.db.mealPlan.recipes[0].name, "Recovered Salmon");
+
+    // Case B: gemini-3.5-flash fails all 3 attempts with 503 -> falls back to gemini-2.5-flash
+    const urlsCalled = [];
+    const mockFetchWithModelFallback = (url, options) => {
+      urlsCalled.push(url);
+      if (url.includes("gemini-3.5-flash")) {
+        return {
+          getResponseCode: () => 503,
+          getContentText: () => JSON.stringify({ error: { code: 503, message: "gemini-3.5-flash unavailable" } })
+        };
+      }
+      // Fallback model returns 200
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({
+          candidates: [{
+            content: {
+              parts: [{
+                text: JSON.stringify({
+                  recipes: [{
+                    name: "Fallback 2.5 Flash Tacos",
+                    description: "Tasty fallback tacos",
+                    prepTime: "10 mins",
+                    cookTime: "15 mins",
+                    ingredients: [{ name: "tortillas", amount: 4, unit: "whole" }],
+                    instructions: ["Fill and enjoy."]
+                  }]
+                })
+              }]
+            }
+          }]
+        })
+      };
+    };
+
+    const contextB = createMockGasContext(db, userProps, {}, [], mockFetchWithModelFallback);
+    const resB = contextB.generateMealPlanServer(1, "");
+    assertEqual(resB.success, true, 'Generation should succeed on fallback model');
+    assertEqual(resB.db.mealPlan.recipes[0].name, "Fallback 2.5 Flash Tacos");
+    assert(urlsCalled.some(u => u.includes("gemini-3.5-flash")), 'Should have attempted primary model first');
+    assert(urlsCalled.some(u => u.includes("gemini-2.5-flash")), 'Should have fallen back to gemini-2.5-flash');
   });
 });
 

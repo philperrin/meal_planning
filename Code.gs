@@ -551,6 +551,100 @@ function buildPantryDirectiveText(pantryIngredients, targetMealsCount) {
   return "- CRITICAL: You MUST prioritize using the following on-hand ingredients across the first " + n + " meals to prevent food waste: [" + cleaned.join(", ") + "]. Ensure these ingredients are explicitly incorporated and clearly listed in those recipes' ingredients lists.\n";
 }
 
+var PRIMARY_GEMINI_MODEL = "gemini-3.5-flash";
+var FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
+var MAX_RETRIES_PER_MODEL = 3;
+var INITIAL_RETRY_DELAY_MS = 1500;
+
+/**
+ * Executes a Gemini API generateContent call with automatic exponential backoff on 503/500/502/504
+ * and automatic fallback to gemini-2.5-flash if the primary model is unavailable or overloaded.
+ */
+function callGeminiWithRetryAndFallback(payload, apiKey, effectiveKey) {
+  var modelsToTry = [PRIMARY_GEMINI_MODEL, FALLBACK_GEMINI_MODEL];
+  var lastError = null;
+
+  for (var m = 0; m < modelsToTry.length; m++) {
+    var modelName = modelsToTry[m];
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
+    var options = {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+
+    var delayMs = INITIAL_RETRY_DELAY_MS;
+    for (var attempt = 1; attempt <= MAX_RETRIES_PER_MODEL; attempt++) {
+      try {
+        var response = UrlFetchApp.fetch(url, options);
+        var responseCode = response.getResponseCode();
+        var responseText = response.getContentText();
+
+        if (responseCode === 200) {
+          var jsonResponse = JSON.parse(responseText);
+          if (!jsonResponse.candidates || !jsonResponse.candidates[0] || !jsonResponse.candidates[0].content || !jsonResponse.candidates[0].content.parts || !jsonResponse.candidates[0].content.parts[0]) {
+            throw new Error("Gemini returned an empty candidate response.");
+          }
+          var textContent = jsonResponse.candidates[0].content.parts[0].text;
+          return {
+            modelUsed: modelName,
+            text: textContent,
+            data: JSON.parse(textContent)
+          };
+        }
+
+        // Handle Quota/Rate Limit (429)
+        if (responseCode === 429) {
+          if (effectiveKey && effectiveKey.keyType === 'shared') {
+            throw new Error("The shared starter API quota is temporarily full. Please wait a moment, or add your own free personal API key in Settings (under '✨ Create API Key') for instant dedicated access.");
+          } else {
+            throw new Error("Your personal Gemini API rate limit / quota has been reached. Please check your Google AI Studio quota limits.");
+          }
+        }
+
+        // Transient Server Errors: 503 (Unavailable/High Demand), 500 (Internal), 502, 504, 404 (Model not found)
+        if (responseCode === 503 || responseCode === 500 || responseCode === 502 || responseCode === 504 || responseCode === 404) {
+          Logger.log("Gemini API returned " + responseCode + " for model " + modelName + " (attempt " + attempt + "/" + MAX_RETRIES_PER_MODEL + "): " + responseText);
+          lastError = new Error("Gemini API error (Status " + responseCode + "): " + responseText);
+
+          if (attempt < MAX_RETRIES_PER_MODEL && responseCode !== 404) {
+            var waitTime = delayMs + Math.floor(Math.random() * 500);
+            if (typeof Utilities !== 'undefined' && Utilities.sleep) {
+              Utilities.sleep(waitTime);
+            }
+            delayMs *= 2;
+            continue;
+          }
+          // Exhausted retries for this model, break to try fallback model
+          break;
+        }
+
+        // Non-retryable error (e.g. 400 Bad Request, 403 Forbidden)
+        throw new Error("Gemini API error (Status " + responseCode + "): " + responseText);
+      } catch (err) {
+        // If it's already a formatted client/user error (like 429 or 400), don't retry, rethrow immediately
+        if (err.message && (err.message.indexOf("quota") !== -1 || err.message.indexOf("Status 400") !== -1 || err.message.indexOf("Status 403") !== -1)) {
+          throw err;
+        }
+        lastError = err;
+        if (attempt < MAX_RETRIES_PER_MODEL) {
+          if (typeof Utilities !== 'undefined' && Utilities.sleep) {
+            Utilities.sleep(delayMs);
+          }
+          delayMs *= 2;
+        }
+      }
+    }
+
+    if (m < modelsToTry.length - 1) {
+      Logger.log("Switching to fallback model: " + modelsToTry[m + 1] + " after primary model " + modelName + " failed.");
+    }
+  }
+
+  throw lastError || new Error("Failed to generate response from Gemini API after retries and fallback.");
+}
+
 /**
  * Calls the Gemini API to reroll/swap a single recipe at targetIndex, avoiding duplicates of all other meals in the plan.
  */
@@ -630,8 +724,6 @@ function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences,
                  "Provide a unique, delicious dinner meal. The recipe must have ingredients, amounts, units, and clear step-by-step instructions. " +
                  "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";
 
-    var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
-
     var payload = {
       contents: [
         {
@@ -671,31 +763,8 @@ function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences,
       }
     };
 
-    var options = {
-      method: "post",
-      contentType: "application/json",
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-
-    var response = UrlFetchApp.fetch(url, options);
-    var responseCode = response.getResponseCode();
-    var responseText = response.getContentText();
-
-    if (responseCode !== 200) {
-      if (responseCode === 429) {
-        if (effectiveKey.keyType === 'shared') {
-          throw new Error("The shared starter API quota is temporarily full. Please wait a moment, or add your own free personal API key in Settings for instant dedicated access.");
-        } else {
-          throw new Error("Your personal Gemini API rate limit / quota has been reached. Please check your Google AI Studio quota limits.");
-        }
-      }
-      throw new Error("Gemini API error (Status " + responseCode + "): " + responseText);
-    }
-
-    var jsonResponse = JSON.parse(responseText);
-    var responseJsonText = jsonResponse.candidates[0].content.parts[0].text;
-    var newRecipe = JSON.parse(responseJsonText);
+    var geminiResult = callGeminiWithRetryAndFallback(payload, apiKey, effectiveKey);
+    var newRecipe = geminiResult.data;
 
     if (!newRecipe || !newRecipe.name) {
       throw new Error("Gemini returned an invalid replacement recipe.");
@@ -871,9 +940,6 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, s
                    "Provide a variety of dinner meals. Every recipe must have ingredients, amounts, units, and clear step-by-step instructions. " +
                    "Format the output strictly according to the requested JSON schema. Do not return any other text or explanation outside the JSON structure.";
                    
-      var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=" + apiKey;
-      
-      // Define the response schema to guarantee JSON formatting
       var payload = {
         contents: [
           {
@@ -923,31 +989,8 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, s
         }
       };
       
-      var options = {
-        method: "post",
-        contentType: "application/json",
-        payload: JSON.stringify(payload),
-        muteHttpExceptions: true
-      };
-      
-      var response = UrlFetchApp.fetch(url, options);
-      var responseCode = response.getResponseCode();
-      var responseText = response.getContentText();
-      
-      if (responseCode !== 200) {
-        if (responseCode === 429) {
-          if (effectiveKey.keyType === 'shared') {
-            throw new Error("The shared starter API quota is temporarily full. Please wait a moment, or add your own free personal API key in Settings (under '✨ Create API Key') for instant dedicated access.");
-          } else {
-            throw new Error("Your personal Gemini API rate limit / quota has been reached. Please check your Google AI Studio quota limits.");
-          }
-        }
-        throw new Error("Gemini API error (Status " + responseCode + "): " + responseText);
-      }
-      
-      var jsonResponse = JSON.parse(responseText);
-      var responseJsonText = jsonResponse.candidates[0].content.parts[0].text;
-      var result = JSON.parse(responseJsonText);
+      var geminiResult = callGeminiWithRetryAndFallback(payload, apiKey, effectiveKey);
+      var result = geminiResult.data;
       
       if (!result.recipes || result.recipes.length === 0) {
         throw new Error("Gemini returned an empty recipes list.");
