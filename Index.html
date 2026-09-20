@@ -7,13 +7,6 @@
   <title>Meal Planning Assistant</title>
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
-  <!-- Progressive Web App (PWA) Manifest & Meta (MPA-21) -->
-  <meta name="theme-color" content="#1e222b">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Meal Planner">
-  <link rel="apple-touch-icon" href="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f37d.png">
-  <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Meal%20Planning%20Assistant%22%2C%22short_name%22%3A%22Meal%20Planner%22%2C%22description%22%3A%22Intelligent%20meal%20planner%20with%20offline%20grocery%20checklist%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%2314171f%22%2C%22theme_color%22%3A%22%231e222b%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Ftwitter%2Ftwemoji%4014.0.2%2Fassets%2F72x72%2F1f37d.png%22%2C%22sizes%22%3A%2272x72%22%2C%22type%22%3A%22image%2Fpng%22%7D%2C%7B%22src%22%3A%22https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Ftwitter%2Ftwemoji%4014.0.2%2Fassets%2F72x72%2F1f37d.png%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fpng%22%7D%5D%7D">
   <!-- Include Premium CSS Stylesheet -->
   <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
 </head>
@@ -29,10 +22,6 @@
         <h1>Meal Planning Assistant</h1>
       </div>
       <div class="header-right-tools">
-        <div class="network-status-pill online" id="network-status-pill" title="Network status: Online">
-          <span class="status-dot"></span>
-          <span class="status-label" id="network-status-label">Online</span>
-        </div>
         <nav class="nav-desktop">
           <button class="nav-tab" data-view="planner">🗓️ Planner</button>
           <button class="nav-tab" data-view="history">📜 History</button>
@@ -59,8 +48,7 @@
             <h2 class="welcome-title">Welcome!</h2>
             <p class="welcome-lead">
               I'm your intelligent meal planning assistant - designed to streamline your weekly dinner planning. I'll
-              help generate balanced meal plans, automatically save and organize recipes directly to your Google Drive,
-              create grocery shopping lists, and schedule meals onto your Google Calendar.
+              help generate balanced meal plans, schedule complete meals onto your Google Calendar, and create a consolidated grocery list event.
             </p>
             <div class="welcome-skip-container">
               <label class="welcome-skip-label" for="skip-welcome-checkbox">
@@ -95,8 +83,7 @@
             </div>
             <h3 class="welcome-card-title">Setting Preferences</h3>
             <p class="welcome-card-desc">
-              Set your <strong>Preferences</strong> for allergies, dietary goals, diners, prep time, and preferred
-              cuisines.</p>
+              Set your <strong>Preferences</strong> for allergies, dietary goals, preferred cuisines, diners, and prep time.</p>
             <button class="welcome-card-btn" type="button"
               onclick="event.stopPropagation(); switchView('preferences');">
               Set Preferences <span>→</span>
@@ -150,32 +137,12 @@
             <textarea id="plan-preferences-input" rows="2" style="min-height: 70px;"></textarea>
           </div>
 
-          <!-- MPA-12: 'Clean Out the Fridge' / Pantry Priority Ingredients Input -->
-          <div class="form-group pantry-input-section" style="margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-              <label for="pantry-tags-input" style="margin-bottom: 0;">🥕 Use up ingredients on hand</label>
-              <button type="button" id="btn-clear-pantry" class="pantry-clear-btn" style="display: none;" onclick="clearAllPantryIngredients()">✕ Clear all</button>
-            </div>
-            <div class="input-desc">
-              Got perishables in the fridge? Add ingredients you want Gemini to prioritize (e.g. <em>spinach, rotisserie chicken, half a cabbage</em>).
-            </div>
-            <div class="pantry-tag-box" id="pantry-tag-box" onclick="focusPantryInput()">
-              <div class="pantry-pills-container" id="pantry-pills-container"></div>
-              <input type="text" id="pantry-tags-input" class="pantry-input" placeholder="Type ingredient & press Enter or comma..." autocomplete="off">
-            </div>
-            <div class="pantry-quick-suggestions" id="pantry-quick-suggestions">
-              <span class="pantry-suggest-label">Quick add:</span>
-              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Spinach')">+ Spinach</button>
-              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Rotisserie chicken')">+ Rotisserie chicken</button>
-              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Bell peppers')">+ Bell peppers</button>
-              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Cabbage')">+ Cabbage</button>
-              <button type="button" class="pantry-suggest-chip" onclick="addPantryIngredient('Mushrooms')">+ Mushrooms</button>
-            </div>
-          </div>
-
-          <!-- MPA-11: Quick Mood & Constraint Chips -->
+          <!-- Quick Presets -->
           <div class="planner-chips-section">
-            <div class="planner-chips-label">⚡ Quick Mood & Style Presets:</div>
+            <div class="planner-chips-label">⚡ Quick Presets</div>
+            <div class="input-desc" style="margin-top: 4px; margin-bottom: 12px; font-size: 13px;">
+              Select one or more presets. One meal in the meal plan will include the presets (not all meals will have all presets applied).
+            </div>
             <div class="planner-chips-grid" id="planner-chips-container">
               <button type="button" class="filter-chip" id="chip-quick" data-tag="quick" onclick="handleToggleFilterChip('quick')">
                 <span class="chip-icon">⚡</span>
@@ -283,30 +250,10 @@
           </div>
 
           <div class="form-group">
-            <label for="pref-dietary-preferences">Dietary Preferences</label>
-            <div class="input-desc">Specify general dietary choices, themes, or preferences.</div>
+            <label for="pref-dietary-preferences">Dietary & Cuisine Preferences</label>
+            <div class="input-desc">Specify general dietary choices, preferred cuisines (e.g., Italian, Mexican, Mediterranean, Asian-inspired), dietary styles, or specific dislikes.</div>
             <textarea id="pref-dietary-preferences"
-              placeholder="e.g., Strong preference for high protein and seasonal vegetables..."></textarea>
-          </div>
-
-          <!-- Cuisine Preferences Section -->
-          <div class="form-group" style="margin-top: 24px;">
-            <div
-              style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
-              <div>
-                <label style="margin-bottom: 2px;">Cuisine & Meal Style Preferences</label>
-                <div class="input-desc" style="margin-bottom: 0;">Select <strong>Prefer</strong> to prioritize
-                  cuisines,
-                  <strong>Avoid</strong> to strictly exclude them, or leave blank/neutral.
-                </div>
-              </div>
-              <button type="button" class="btn btn-secondary" onclick="handleResetCuisines()"
-                style="padding: 6px 14px; font-size: 12px; height: auto;">↺ Reset All</button>
-            </div>
-
-            <div id="cuisine-grid" class="cuisine-grid">
-              <!-- Dynamically populated cuisine items -->
-            </div>
+              placeholder="e.g., Prefer Mediterranean, Mexican, and Italian cuisines. High protein, lean meats, plenty of vegetables..."></textarea>
           </div>
 
           <!-- Diner Count and daily prep time row -->
@@ -407,81 +354,13 @@
             Upon meal plan approval, the assistant will automatically generate:
           </p>
           <ul
-            style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
-            <li>Google Docs for individual recipes inside a folder called <strong>Meal Plan Recipes</strong>.</li>
-            <li>Prep & cook events scheduled on your default Google Calendar at your configured daily prep time.</li>
-            <li>A single consolidated, smart-merged shopping list Google Doc placed in a subfolder called
-              <strong>Shopping Lists</strong>.
-            </li>
+            <li>Prep & cook events scheduled on your default Google Calendar with complete recipe details and instructions in the event description.</li>
+            <li>A dedicated <strong>Groceries</strong> event on your Google Calendar containing your complete grocery list organized by store section.</li>
           </ul>
         </div>
       </div>
 
     </main>
-
-    <!-- FULLSCREEN GROCERY SHOPPING MODE MODAL (MPA-21) -->
-    <div class="grocery-mode-modal" id="grocery-mode-modal" style="display: none;" role="dialog" aria-label="Grocery Shopping Mode">
-      <div class="grocery-mode-container">
-        <!-- Grocery Mode Header -->
-        <div class="grocery-mode-header">
-          <div class="grocery-mode-title-row">
-            <div class="grocery-mode-branding">
-              <span class="grocery-mode-icon">🛒</span>
-              <div>
-                <h2 class="grocery-mode-title">Grocery Shopping Mode</h2>
-                <div class="grocery-mode-stats" id="grocery-mode-stats">0 of 0 items checked (0% complete)</div>
-              </div>
-            </div>
-            <button class="btn btn-secondary grocery-mode-close-btn" id="btn-close-grocery-mode" onclick="handleCloseGroceryMode()">
-              ✕ Done Shopping
-            </button>
-          </div>
-
-          <!-- Utility Toolbar (Wake Lock, Hide Checked, Offline indicator) -->
-          <div class="grocery-mode-toolbar">
-            <div class="grocery-toolbar-left">
-              <label class="grocery-toggle-label" title="Hide items that have already been checked off">
-                <input type="checkbox" id="grocery-hide-checked-toggle" onchange="handleToggleHideChecked(this.checked)">
-                <span class="grocery-custom-switch"></span>
-                <span>👁️ Hide Checked</span>
-              </label>
-              <div class="grocery-wakelock-badge" id="grocery-wakelock-badge" title="Screen stays awake while shopping">
-                <span>☀️ Screen Awake</span>
-              </div>
-            </div>
-            <div class="grocery-toolbar-right">
-              <button class="btn btn-secondary btn-sm" id="btn-copy-grocery-mode" onclick="handleCopyShoppingList()">📋 Copy</button>
-              <button class="btn btn-secondary btn-sm" id="btn-reset-grocery-mode" onclick="handleResetShoppingChecklist()">↺ Reset</button>
-            </div>
-          </div>
-
-          <!-- Sticky Horizontal Aisle Filter Pills -->
-          <div class="grocery-aisle-bar" id="grocery-aisle-bar">
-            <!-- Dynamic Aisle Pills -->
-          </div>
-        </div>
-
-        <!-- Grocery Mode Items List Area -->
-        <div class="grocery-mode-content" id="grocery-mode-content">
-          <!-- Dynamic Categorized Grocery Items -->
-        </div>
-
-        <!-- Grocery Mode Footer: Ad-Hoc Item Addition -->
-        <div class="grocery-mode-footer">
-          <form class="grocery-add-form" id="grocery-add-form" onsubmit="handleAddCustomGroceryItem(event)">
-            <input type="text" class="grocery-add-input" id="grocery-add-input" placeholder="➕ Add in-store item (e.g., Oat milk, Paper towels)..." autocomplete="off" />
-            <select class="grocery-add-select" id="grocery-add-category">
-              <option value="🥬 Produce">🥬 Produce</option>
-              <option value="🥩 Meat & Seafood">🥩 Meat</option>
-              <option value="🧀 Dairy & Refrigerated">🧀 Dairy</option>
-              <option value="🥫 Pantry & Canned" selected>🥫 Pantry</option>
-              <option value="🧂 Spices & Baking">🧂 Spices</option>
-            </select>
-            <button type="submit" class="btn btn-sm grocery-add-btn">Add</button>
-          </form>
-        </div>
-      </div>
-    </div>
 
     <!-- STICKY BOTTOM NAVIGATION (MOBILE) -->
     <nav class="bottom-nav" id="bottom-nav" aria-label="Mobile Navigation">

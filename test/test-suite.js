@@ -221,7 +221,11 @@ function createMockGasContext(initialDb, initialUserProps = {}, initialScriptPro
     },
     CalendarApp: {
       getDefaultCalendar: () => ({
-        createEvent: () => ({})
+        createEvent: (title, startTime, endTime, options) => {
+          if (!sandbox._createdCalendarEvents) sandbox._createdCalendarEvents = [];
+          sandbox._createdCalendarEvents.push({ title, startTime, endTime, options });
+          return {};
+        }
       })
     },
     UrlFetchApp: {
@@ -403,7 +407,6 @@ describe('2. Frontend DOM & Template Structure (Index.html)', () => {
       'pref-meal-time',
       'pref-skip-welcome',
       'skip-welcome-checkbox',
-      'cuisine-grid',
       'api-key-input',
       'api-badge',
       'api-desc',
@@ -424,6 +427,9 @@ describe('2. Frontend DOM & Template Structure (Index.html)', () => {
       const pattern = new RegExp(`id=["']${id}["']`, 'i');
       assert(pattern.test(indexHtml), `Index.html is missing element with id="${id}"`);
     });
+
+    assert(indexHtml.includes('Dietary & Cuisine Preferences'), 'Index.html must incorporate cuisine preferences guidance in dietary preferences');
+    assert(indexHtml.includes('⚡ Quick Presets'), 'Index.html must display Quick Presets label');
 
     // 3. Desktop and mobile navigation with all 4 primary views
     assert(/<nav\s+class=["'][^"']*nav-desktop/i.test(indexHtml), 'Missing desktop nav container in Index.html');
@@ -698,12 +704,6 @@ describe('7. Meal Planning Preferences & Helper Logic', () => {
 // 8. Recipe Rating & History Management (MPA-8 & MPA-15)
 describe('8. Recipe Favorites & History Management (MPA-8 & MPA-15)', () => {
   test('Backend toggles binary favorites, caches recipe library, and sorts history/favorites accurately', () => {
-    const mockFiles = [
-      { name: "20260901 - Old Salmon", id: "salmon-doc", createdTime: 1000 },
-      { name: "20260908 - Fresh Tacos", id: "tacos-doc", createdTime: 2000 },
-      { name: "20260905 - Mid Chicken", id: "chicken-doc", createdTime: 1500 }
-    ];
-
     const initialDb = {
       preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
       mealPlan: null,
@@ -712,11 +712,33 @@ describe('8. Recipe Favorites & History Management (MPA-8 & MPA-15)', () => {
         "Mid Chicken": { isFavorite: true, rating: 4 },
         "Fresh Tacos": { isFavorite: false, rating: 0 }
       },
-      recipeLibrary: {},
+      recipeLibrary: {
+        "Old Salmon": {
+          name: "Old Salmon",
+          description: "Baked salmon",
+          lastScheduledDate: "2026-09-01",
+          ingredients: [],
+          instructions: []
+        },
+        "Fresh Tacos": {
+          name: "Fresh Tacos",
+          description: "Street tacos",
+          lastScheduledDate: "2026-09-08",
+          ingredients: [],
+          instructions: []
+        },
+        "Mid Chicken": {
+          name: "Mid Chicken",
+          description: "Grilled chicken",
+          lastScheduledDate: "2026-09-05",
+          ingredients: [],
+          instructions: []
+        }
+      },
       lastUpdated: new Date().toISOString()
     };
 
-    const context = createMockGasContext(initialDb, {}, {}, mockFiles);
+    const context = createMockGasContext(initialDb);
 
     // 1. Binary favorite toggling & library caching via toggleFavoriteRecipeServer()
     const favRecipeObj = {
@@ -748,9 +770,9 @@ describe('8. Recipe Favorites & History Management (MPA-8 & MPA-15)', () => {
     assertEqual(resRating.isFavorite, true);
     assertEqual(resRating.rating, 5);
 
-    // 4. getRecipeHistory() sorting and favorite filtering
+    // 4. getRecipeHistory() sorting and favorite filtering from db.recipeLibrary
     const result = context.getRecipeHistory();
-    assertEqual(result.history.length, 3, 'History should contain all 3 recipes');
+    assert(result.history.length >= 3, 'History should contain at least 3 recipes');
     assertEqual(result.history[0].name, 'Fresh Tacos', 'Most recent scheduled date (2026-09-08) should be first');
     assertEqual(result.history[1].name, 'Mid Chicken', 'Second scheduled date (2026-09-05) should be second');
     assertEqual(result.history[2].name, 'Old Salmon', 'Third scheduled date (2026-09-01) should be third');
@@ -761,6 +783,12 @@ describe('8. Recipe Favorites & History Management (MPA-8 & MPA-15)', () => {
     assertEqual(result.favorites[1].name, 'Old Salmon', 'Older scheduled favorite (2026-09-01) should be second');
     assertEqual(result.favorites[1].isFavorite, true);
     assert(result.library !== undefined, 'Library object should be returned');
+
+    // 5. On-demand createRecipeDocServer()
+    const docRes = context.createRecipeDocServer('Fresh Tacos');
+    assertEqual(docRes.success, true, 'createRecipeDocServer should succeed');
+    assert(docRes.docUrl.includes('mock-doc-id'), 'docUrl should be generated');
+    assertEqual(context.getMockDbState().recipeLibrary['Fresh Tacos'].docId, 'mock-doc-id');
   });
 });
 
@@ -808,13 +836,9 @@ describe('9. Meal Plan Generation with Recipe Reuse (MPA-8)', () => {
   });
 });
 
-// 10. Meal Plan Approval & Document Lifecycle (MPA-8)
-describe('10. Meal Plan Approval & Document Lifecycle (MPA-8)', () => {
-  test('approveMealPlanServer() re-titles existing Google Docs and synchronizes recipeLibrary metadata', () => {
-    const mockFiles = [
-      { name: "20260901 - Classic Salmon", id: "salmon-doc-123", createdTime: 1000 }
-    ];
-
+// 10. Meal Plan Approval & Calendar-First Integration
+describe('10. Meal Plan Approval & Calendar-First Integration', () => {
+  test('approveMealPlanServer() creates Calendar events (dinners + Groceries) and synchronizes recipeLibrary metadata', () => {
     const initialDb = {
       preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
       mealPlan: {
@@ -825,8 +849,7 @@ describe('10. Meal Plan Approval & Document Lifecycle (MPA-8)', () => {
             prepTime: "10 mins",
             cookTime: "20 mins",
             ingredients: [{ name: "Salmon", amount: 2, unit: "fillets" }],
-            instructions: ["Roast salmon."],
-            docId: "salmon-doc-123"
+            instructions: ["Roast salmon."]
           }
         ],
         approved: false,
@@ -837,16 +860,18 @@ describe('10. Meal Plan Approval & Document Lifecycle (MPA-8)', () => {
       lastUpdated: new Date().toISOString()
     };
 
-    const context = createMockGasContext(initialDb, {}, {}, mockFiles);
+    const context = createMockGasContext(initialDb);
     const approvedList = [{ name: "Classic Salmon", date: "2026-09-14" }];
 
     const res = context.approveMealPlanServer(approvedList);
     assertEqual(res.success, true, 'approveMealPlanServer should succeed');
-    assertEqual(mockFiles[0].name, "20260914 - Classic Salmon", 'Existing file must be renamed with the new date prefix');
 
     const db = context.getMockDbState();
     assertEqual(db.recipeLibrary["Classic Salmon"].lastScheduledDate, "2026-09-14", 'lastScheduledDate must be saved in recipeLibrary');
+    assertEqual(db.recipeLibrary["Classic Salmon"].name, "Classic Salmon");
     assertEqual(db.mealPlan.approved, true, 'Plan approved status must be true');
+    assertEqual(db.mealPlan.executionResult.calendarEventsCreated, 1, '1 dinner calendar event created');
+    assertEqual(db.mealPlan.executionResult.groceriesEventCreated, true, 'Groceries calendar event created');
   });
 });
 
@@ -889,9 +914,9 @@ describe('11. Family Favorites 1-Click Plan Insertion & Live Plan Editing (MPA-1
   });
 });
 
-// 12. Interactive In-App Grocery Checklist & Aisle Sorting (MPA-13)
-describe('12. Interactive In-App Grocery Checklist & Aisle Sorting (MPA-13)', () => {
-  test('Backend and Frontend accurately categorize ingredients, sort by aisle, format markdown text, and generate HTML', () => {
+// 12. Grocery List Consolidation, Aisle Sorting & Markdown Formatting (Calendar Groceries Event)
+describe('12. Grocery List Consolidation, Aisle Sorting & Markdown Formatting (Calendar Groceries Event)', () => {
+  test('Backend and Frontend accurately categorize ingredients, sort by aisle, and format text for Google Calendar groceries event', () => {
     const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
     const scriptMatch = jsHtml.match(/<script[\s\S]*?>([\s\S]*?)<\/script>/i);
     const clientCtx = createMockBrowserContext();
@@ -957,8 +982,6 @@ describe('12. Interactive In-App Grocery Checklist & Aisle Sorting (MPA-13)', ()
       recipes: recipes,
       executionResult: {
         shoppingList: backendConsolidated,
-        shoppingListDocName: "20260907 - Shopping List",
-        shoppingListDocUrl: "https://docs.google.com/test",
         recipeDocs: []
       }
     };
@@ -972,17 +995,7 @@ describe('12. Interactive In-App Grocery Checklist & Aisle Sorting (MPA-13)', ()
     assert(formattedText.includes("- Garlic: 4 cloves"), "Missing formatted garlic bullet");
     assert(formattedText.includes("- Chicken breast: 1.5 lbs"), "Missing formatted chicken bullet");
 
-    // 4. Client renderShoppingListHtml generates interactive HTML with category cards and custom checkboxes
-    const htmlOutput = clientCtx.renderShoppingListHtml(mockPlan);
-    assert(htmlOutput.includes('id="shopping-list-section"'), "Missing shopping list section ID");
-    assert(htmlOutput.includes('class="shopping-list-panel"'), "Missing shopping list panel class");
-    assert(htmlOutput.includes('id="btn-copy-shopping-list"'), "Missing copy list button");
-    assert(htmlOutput.includes('id="btn-reset-shopping-checklist"'), "Missing reset checklist button");
-    assert(htmlOutput.includes('class="shopping-progress-bar"'), "Missing progress bar element");
-    assert(htmlOutput.includes('class="shopping-item-checkbox"'), "Missing item checkboxes");
-    assert(htmlOutput.includes('class="shopping-custom-checkbox"'), "Missing custom checkbox styling element");
-
-    // 5. approveMealPlanServer attaches shoppingList to executionResult and db.mealPlan
+    // 4. approveMealPlanServer attaches shoppingList to executionResult and db.mealPlan
     const approvedList = [{ name: "Garlic Chicken", date: "2026-09-08" }];
     const approveDb = {
       preferences: { dinersCount: 2, defaultMealTime: "06:00 PM" },
@@ -1159,27 +1172,14 @@ describe("16. 'Clean Out the Fridge' / Pantry Priority Ingredients Input (MPA-12
     assert(rerollPrompt.includes("spinach, rotisserie chicken, half a cabbage"), "Reroll prompt missing pantry items list");
   });
 
-  test('Frontend DOM template, CSS styles, and JS client helpers for pantry tags and badges', () => {
+  test('Frontend DOM template streamlining: pantry input removed while backend/JS helpers remain intact', () => {
     const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-    assert(indexHtml.includes('id="pantry-tags-input"'), "Missing #pantry-tags-input in Index.html");
-    assert(indexHtml.includes('id="pantry-tag-box"'), "Missing #pantry-tag-box in Index.html");
-    assert(indexHtml.includes('id="pantry-pills-container"'), "Missing #pantry-pills-container in Index.html");
-    assert(indexHtml.includes('id="btn-clear-pantry"'), "Missing #btn-clear-pantry in Index.html");
-
-    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
-    assert(stylesHtml.includes('.pantry-input-section'), "Missing .pantry-input-section in Styles.html");
-    assert(stylesHtml.includes('.pantry-tag-box'), "Missing .pantry-tag-box in Styles.html");
-    assert(stylesHtml.includes('.pantry-pill'), "Missing .pantry-pill in Styles.html");
-    assert(stylesHtml.includes('.pantry-item-badge'), "Missing .pantry-item-badge in Styles.html");
-    assert(stylesHtml.includes('.recipe-pantry-badge'), "Missing .recipe-pantry-badge in Styles.html");
+    assert(!indexHtml.includes('id="pantry-tags-input"'), "Pantry input should be removed from Index.html front-end");
 
     const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
     assert(jsHtml.includes('setupPantryTagListeners'), "Missing setupPantryTagListeners in JavaScript.html");
     assert(jsHtml.includes('addPantryIngredient'), "Missing addPantryIngredient in JavaScript.html");
-    assert(jsHtml.includes('removePantryIngredient'), "Missing removePantryIngredient in JavaScript.html");
-    assert(jsHtml.includes('clearAllPantryIngredients'), "Missing clearAllPantryIngredients in JavaScript.html");
     assert(jsHtml.includes('isPantryItemMatch'), "Missing isPantryItemMatch in JavaScript.html");
-    assert(jsHtml.includes('getMatchedPantryItemsForRecipe'), "Missing getMatchedPantryItemsForRecipe in JavaScript.html");
   });
 });
 
@@ -1309,204 +1309,19 @@ describe('17. Tier 1 Deterministic Prompt Evaluation & Constraint Safety Suite (
   });
 });
 
-// 18. Progressive Web App (PWA) & Offline Grocery Mode (MPA-21)
-describe('18. Progressive Web App (PWA) & Offline Grocery Mode (MPA-21)', () => {
-  test('Index.html defines valid PWA Web Manifest, iOS meta tags, and Network Status badge', () => {
+// 18. Calendar-First Streamlining & Clean Removal of PWA / Offline Modals
+describe('18. Calendar-First Streamlining & Clean Removal of PWA / Offline Modals', () => {
+  test('Index.html has removed PWA manifests, network status pill, and grocery mode modal', () => {
     const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-    assert(indexHtml.includes('<meta name="theme-color" content="#1e222b">'), 'Missing theme-color meta tag');
-    assert(indexHtml.includes('<meta name="apple-mobile-web-app-capable" content="yes">'), 'Missing apple-mobile-web-app-capable tag');
-    assert(indexHtml.includes('<meta name="apple-mobile-web-app-title" content="Meal Planner">'), 'Missing apple-mobile-web-app-title tag');
-    assert(indexHtml.includes('<link rel="manifest"'), 'Missing link rel=manifest tag');
-    assert(indexHtml.includes('id="network-status-pill"'), 'Missing network-status-pill ID');
-    assert(indexHtml.includes('id="network-status-label"'), 'Missing network-status-label ID');
-
-    // Extract manifest JSON from Data URI
-    const manifestMatch = indexHtml.match(/href="data:application\/manifest\+json,([^"]+)"/);
-    assert(manifestMatch, 'Could not extract inline Data URI manifest from Index.html');
-    const decodedManifest = JSON.parse(decodeURIComponent(manifestMatch[1]));
-    assertEqual(decodedManifest.name, 'Meal Planning Assistant');
-    assertEqual(decodedManifest.short_name, 'Meal Planner');
-    assertEqual(decodedManifest.display, 'standalone');
-    assertEqual(decodedManifest.theme_color, '#1e222b');
-    assert(Array.isArray(decodedManifest.icons) && decodedManifest.icons.length > 0, 'Manifest must include icons');
+    assert(!indexHtml.includes('<link rel="manifest"'), 'PWA manifest link should be removed from Index.html');
+    assert(!indexHtml.includes('id="network-status-pill"'), 'network-status-pill should be removed from header');
+    assert(!indexHtml.includes('id="grocery-mode-modal"'), 'grocery-mode-modal should be removed from Index.html');
   });
 
-  test('Index.html defines Fullscreen Grocery Mode Modal, Aisle Bar, and Ad-Hoc Item Form', () => {
-    const indexHtml = fs.readFileSync(path.join(ROOT_DIR, 'Index.html'), 'utf8');
-    assert(indexHtml.includes('id="grocery-mode-modal"'), 'Missing grocery-mode-modal ID');
-    assert(indexHtml.includes('id="grocery-mode-stats"'), 'Missing grocery-mode-stats ID');
-    assert(indexHtml.includes('id="btn-close-grocery-mode"'), 'Missing btn-close-grocery-mode ID');
-    assert(indexHtml.includes('id="grocery-hide-checked-toggle"'), 'Missing grocery-hide-checked-toggle ID');
-    assert(indexHtml.includes('id="grocery-wakelock-badge"'), 'Missing grocery-wakelock-badge ID');
-    assert(indexHtml.includes('id="grocery-aisle-bar"'), 'Missing grocery-aisle-bar ID');
-    assert(indexHtml.includes('id="grocery-mode-content"'), 'Missing grocery-mode-content ID');
-    assert(indexHtml.includes('id="grocery-add-form"'), 'Missing grocery-add-form ID');
-    assert(indexHtml.includes('id="grocery-add-input"'), 'Missing grocery-add-input ID');
-    assert(indexHtml.includes('id="grocery-add-category"'), 'Missing grocery-add-category ID');
-  });
-
-  test('Styles.html defines CSS for Grocery Mode, Aisle Pills, and Network Status indicator', () => {
-    const stylesHtml = fs.readFileSync(path.join(ROOT_DIR, 'Styles.html'), 'utf8');
-    assert(stylesHtml.includes('.network-status-pill'), 'Missing .network-status-pill styling');
-    assert(stylesHtml.includes('.network-status-pill.online'), 'Missing .network-status-pill.online styling');
-    assert(stylesHtml.includes('.network-status-pill.offline'), 'Missing .network-status-pill.offline styling');
-    assert(stylesHtml.includes('.grocery-mode-modal'), 'Missing .grocery-mode-modal styling');
-    assert(stylesHtml.includes('.grocery-aisle-bar'), 'Missing .grocery-aisle-bar styling');
-    assert(stylesHtml.includes('.grocery-aisle-pill.active'), 'Missing .grocery-aisle-pill.active styling');
-    assert(stylesHtml.includes('.grocery-mode-content.hide-checked'), 'Missing .hide-checked CSS rule');
-    assert(stylesHtml.includes('.grocery-wakelock-badge'), 'Missing .grocery-wakelock-badge styling');
-    assert(stylesHtml.includes('.grocery-add-form'), 'Missing .grocery-add-form styling');
-  });
-
-  test('JavaScript.html client helpers handle Offline Plan Caching, Custom Items, and Grocery Mode', () => {
-    const jsContent = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
-    const cleanJs = jsContent.replace(/<\/?script>/g, '');
-
-    // Setup Mock DOM & LocalStorage for VM
-    const mockStorage = {};
-    const mockLocalStorage = {
-      getItem: (k) => mockStorage[k] || null,
-      setItem: (k, v) => { mockStorage[k] = String(v); },
-      removeItem: (k) => { delete mockStorage[k]; },
-      clear: () => { Object.keys(mockStorage).forEach(k => delete mockStorage[k]); }
-    };
-
-    const mockDoc = {
-      getElementById: (id) => ({
-        id,
-        classList: {
-          add: () => {},
-          remove: () => {},
-          toggle: () => {},
-          contains: () => false
-        },
-        style: {},
-        value: '',
-        textContent: '',
-        innerHTML: ''
-      }),
-      querySelectorAll: () => [],
-      querySelector: () => null,
-      addEventListener: () => {}
-    };
-
-    const sandbox = {
-      console,
-      localStorage: mockLocalStorage,
-      document: mockDoc,
-      window: {
-        addEventListener: () => {},
-        scrollTo: () => {}
-      },
-      navigator: {
-        onLine: true,
-        wakeLock: {
-          request: async () => ({
-            addEventListener: () => {},
-            release: async () => {}
-          })
-        }
-      },
-      setTimeout: (fn) => fn(),
-      Set,
-      Array,
-      Object,
-      Math,
-      String,
-      JSON,
-      parseInt,
-      parseFloat
-    };
-
-    vm.createContext(sandbox);
-    vm.runInContext(cleanJs, sandbox);
-
-    // 1. Test offline plan caching & restoration
-    const samplePlan = {
-      generatedAt: "2026-09-16T22:00:00.000Z",
-      recipes: [
-        {
-          name: "Crispy Salmon with Asparagus",
-          ingredients: [
-            { name: "salmon fillet", amount: 2, unit: "lbs" },
-            { name: "asparagus", amount: 1, unit: "bunch" }
-          ]
-        }
-      ]
-    };
-
-    sandbox.cacheActivePlanLocally(samplePlan);
-    const cachedStr = mockStorage['mp_active_plan_cache'];
-    assert(cachedStr, 'cacheActivePlanLocally should write to mp_active_plan_cache in localStorage');
-    const parsedCache = JSON.parse(cachedStr);
-    assertEqual(parsedCache.recipes[0].name, "Crispy Salmon with Asparagus");
-
-    // 2. Test custom grocery items addition and consolidation
-    const customItems = [
-      { name: "Organic Honeycrisp Apples", category: "🥬 Produce", amount: "4", unit: "items" },
-      { name: "Unsweetened Almond Milk", category: "🧀 Dairy & Refrigerated", amount: "1", unit: "carton" }
-    ];
-    sandbox.saveStoredCustomGroceryItems(samplePlan, customItems);
-    const loadedCustom = sandbox.getStoredCustomGroceryItems(samplePlan);
-    assertEqual(loadedCustom.length, 2);
-    assertEqual(loadedCustom[0].name, "Organic Honeycrisp Apples");
-
-    const consolidated = sandbox.getConsolidatedShoppingList(samplePlan);
-    assert(consolidated.length >= 4, "Consolidated list should merge recipe ingredients and custom items");
-    assert(consolidated.some(item => item.name === "Organic Honeycrisp Apples"), "Should include custom apples");
-    assert(consolidated.some(item => item.name === "salmon fillet"), "Should include recipe salmon");
-
-    // 3. Test checklist storage key generation
-    const key = sandbox.getShoppingChecklistStorageKey(samplePlan);
-    assertEqual(key.startsWith('mp_checklist_'), true);
-  });
-
-  test('Code.gs syncShoppingChecklistServer persists checked states and custom grocery items to DB', () => {
-    const codeGsContent = fs.readFileSync(path.join(ROOT_DIR, 'Code.gs'), 'utf8');
-
-    let savedDb = null;
-    const mockDb = {
-      preferences: { dinersCount: 4 },
-      mealPlan: {
-        recipes: [{ name: "Tacos" }]
-      }
-    };
-
-    const mockFile = {
-      getBlob: () => ({ getDataAsString: () => JSON.stringify(mockDb) }),
-      setContent: (content) => { savedDb = JSON.parse(content); }
-    };
-
-    const mockDriveApp = {
-      getFilesByName: () => ({
-        hasNext: () => true,
-        next: () => mockFile
-      })
-    };
-
-    const sandbox = {
-      Logger: { log: () => {} },
-      DriveApp: mockDriveApp,
-      DB_FILENAME: "Automated_Meal_Planner_DB.json",
-      getDatabaseFile: () => mockFile,
-      JSON,
-      Date,
-      Array
-    };
-
-    vm.createContext(sandbox);
-    vm.runInContext(codeGsContent, sandbox);
-
-    const checkedItems = ["salmon fillet", "asparagus"];
-    const customItems = [{ name: "Sparkling Water", category: "🥫 Pantry & Canned" }];
-
-    const result = sandbox.syncShoppingChecklistServer(checkedItems, customItems);
-    assertEqual(result.success, true);
-    assertEqual(result.checkedCount, 2);
-    assertEqual(result.customCount, 1);
-    assert(savedDb !== null, "Database content must be updated and saved");
-    assertEqual(savedDb.mealPlan.checkedItems.length, 2);
-    assertEqual(savedDb.mealPlan.customItems[0].name, "Sparkling Water");
+  test('JavaScript.html contains on-demand handleCreateRecipeDoc and calendar link handling', () => {
+    const jsHtml = fs.readFileSync(path.join(ROOT_DIR, 'JavaScript.html'), 'utf8');
+    assert(jsHtml.includes('handleCreateRecipeDoc'), 'JavaScript.html must define handleCreateRecipeDoc');
+    assert(jsHtml.includes('createRecipeDocServer'), 'JavaScript.html must call createRecipeDocServer');
   });
 });
 

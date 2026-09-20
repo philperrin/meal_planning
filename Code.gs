@@ -464,7 +464,7 @@ function buildTagDirectivesText(selectedTags) {
     }
   });
   if (lines.length === 0) return "";
-  return lines.join("\n") + "\n";
+  return "- Quick Presets Guideline (Incorporate across one or more meals in the plan):\n" + lines.join("\n") + "\n";
 }
 
 /**
@@ -549,7 +549,7 @@ function rerollSingleRecipeServer(targetIndex, existingRecipes, planPreferences,
                  "Scale all ingredient quantities in the recipe to feed exactly " + prefs.dinersCount + " diners.\n" +
                  "You MUST strictly follow these constraints:\n" +
                  "- Allergy Constraint: " + (prefs.allergies || "None specified") + "\n" +
-                 "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
+                 "- Dietary & Cuisine Preferences: " + (prefs.dietaryPreferences || "None specified") + " (Incorporate any cuisine styles, flavor preferences, and dietary restrictions specified here)\n" +
                  cuisineConstraintText +
                  pantryDirectiveText +
                  avoidText +
@@ -790,7 +790,7 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, s
                    "Scale all ingredient quantities in every recipe to feed exactly " + prefs.dinersCount + " diners.\n" +
                    "You MUST strictly follow these constraints:\n" +
                    "- Allergy Constraint: " + (prefs.allergies || "None specified") + "\n" +
-                   "- Dietary Preferences: " + (prefs.dietaryPreferences || "None specified") + "\n" +
+                   "- Dietary & Cuisine Preferences: " + (prefs.dietaryPreferences || "None specified") + " (Incorporate any cuisine styles, flavor preferences, and dietary restrictions specified here)\n" +
                    cuisineConstraintText +
                    pantryDirectiveText +
                    reusedAvoidText +
@@ -1125,79 +1125,20 @@ function approveMealPlanServer(approvedMealsWithDates) {
       calendarEventsCreated: 0
     };
     
-    // Create folders
-    var parentFolder = getOrCreateFolder(PARENT_FOLDER_NAME);
-    var shoppingListFolder = getOrCreateSubfolder(parentFolder, SHOPPING_LISTS_FOLDER_NAME);
     var calendar = CalendarApp.getDefaultCalendar();
+    var executionResult = {
+      calendarEventsCreated: 0,
+      groceriesEventCreated: false
+    };
     
-    // 1. Process Google Docs for each recipe (rename if existing, create if new) & Calendar events
+    // 1. Process structured recipe caching in database & schedule Calendar events with full details
     selectedRecipes.forEach(function(item) {
       var recipe = item.recipe;
       var dateVal = item.dateVal; // YYYY-MM-DD
-      var dateCompact = dateVal.replace(/-/g, ''); // YYYYMMDD
-      var docName = dateCompact + " - " + recipe.name;
-      var docUrl = "";
-      var docId = recipe.docId || "";
       
-      // Look for existing file if reused or already created
-      var existingFile = null;
-      if (docId) {
-        try {
-          existingFile = DriveApp.getFileById(docId);
-        } catch (e) {
-          existingFile = null;
-        }
-      }
+      var existingLib = db.recipeLibrary[recipe.name] || {};
       
-      if (!existingFile) {
-        // Search by name in Parent Folder
-        var files = parentFolder.getFiles();
-        while (files.hasNext()) {
-          var f = files.next();
-          var match = f.getName().match(/^(\d{8})\s*-\s*(.+)$/);
-          if (match && match[2].trim().toLowerCase() === recipe.name.trim().toLowerCase()) {
-            existingFile = f;
-            break;
-          }
-        }
-      }
-      
-      if (existingFile) {
-        // Re-use existing file and rename with new date
-        existingFile.setName(docName);
-        docUrl = existingFile.getUrl();
-        docId = existingFile.getId();
-      } else {
-        // Create new Doc named "YYYYMMDD - Recipe Name"
-        var doc = DocumentApp.create(docName);
-        var body = doc.getBody();
-        
-        body.appendParagraph(recipe.name).setHeading(DocumentApp.ParagraphHeading.HEADING1);
-        body.appendParagraph(recipe.description).setItalic(true);
-        body.appendParagraph("Date Scheduled: " + dateVal + " | Prep Time: " + recipe.prepTime + " | Cook Time: " + recipe.cookTime);
-        body.appendParagraph("Diners Scaled For: " + prefs.dinersCount).setBold(true);
-        
-        body.appendParagraph("Ingredients").setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        (recipe.ingredients || []).forEach(function(ing) {
-          body.appendListItem(ing.amount + " " + ing.unit + " " + ing.name);
-        });
-        
-        body.appendParagraph("Instructions").setHeading(DocumentApp.ParagraphHeading.HEADING2);
-        (recipe.instructions || []).forEach(function(step, stepIdx) {
-          body.appendListItem((stepIdx + 1) + ". " + step);
-        });
-        
-        doc.saveAndClose();
-        
-        // Move to Parent Folder
-        var docFile = DriveApp.getFileById(doc.getId());
-        docFile.moveTo(parentFolder);
-        
-        docUrl = doc.getUrl();
-        docId = doc.getId();
-      }
-      
-      // Cache structured recipe in db.recipeLibrary
+      // Cache structured recipe in db.recipeLibrary (retaining docUrl/docId if already created on demand)
       db.recipeLibrary[recipe.name] = {
         name: recipe.name,
         description: recipe.description || "",
@@ -1205,17 +1146,11 @@ function approveMealPlanServer(approvedMealsWithDates) {
         cookTime: recipe.cookTime || "20m",
         ingredients: recipe.ingredients || [],
         instructions: recipe.instructions || [],
-        docUrl: docUrl,
-        docId: docId,
+        docUrl: existingLib.docUrl || recipe.docUrl || "",
+        docId: existingLib.docId || recipe.docId || "",
         originalDiners: prefs.dinersCount,
         lastScheduledDate: dateVal
       };
-      
-      executionResult.recipeDocs.push({
-        name: recipe.name,
-        date: dateVal,
-        url: docUrl
-      });
       
       // Create Google Calendar Event
       var dateParts = dateVal.split('-');
@@ -1228,44 +1163,38 @@ function approveMealPlanServer(approvedMealsWithDates) {
       var startTime = new Date(year, month, day, timeDetails.hours, timeDetails.minutes, 0);
       var endTime = new Date(year, month, day, timeDetails.hours + 1, timeDetails.minutes, 0);
       
-      var description = "Prep & Cook: " + recipe.name + "\n\n" +
+      var description = "Meal: " + recipe.name + "\n\n" +
                         (recipe.description || "") + "\n\n" +
                         "Diners: " + prefs.dinersCount + "\n" +
                         "Prep Time: " + (recipe.prepTime || "15m") + " | Cook Time: " + (recipe.cookTime || "20m") + "\n\n" +
                         "Ingredients:\n" +
                         (recipe.ingredients || []).map(function(i) { return "- " + i.amount + " " + i.unit + " " + i.name; }).join("\n") + "\n\n" +
                         "Instructions:\n" +
-                        (recipe.instructions || []).map(function(step, idx) { return (idx + 1) + ". " + step; }).join("\n") + "\n\n" +
-                        "Recipe Document: " + docUrl;
+                        (recipe.instructions || []).map(function(step, idx) { return (idx + 1) + ". " + step; }).join("\n");
                         
-      calendar.createEvent("Meal Prep: " + recipe.name, startTime, endTime, {
+      calendar.createEvent(recipe.name, startTime, endTime, {
         description: description,
         location: "Home Kitchen"
       });
       executionResult.calendarEventsCreated++;
     });
     
-    // 2. Generate Consolidated Shopping List
+    // 2. Generate Consolidated Shopping List and schedule "Groceries" Google Calendar Event
     var rawSelectedRecipes = selectedRecipes.map(function(item) { return item.recipe; });
     var consolidatedList = consolidateShoppingList(rawSelectedRecipes);
     
     var dates = approvedMealsWithDates.map(function(item) { return item.date; });
     dates.sort();
     var earliestDateVal = dates[0] || new Date().toISOString().substring(0, 10);
-    var earliestDateCompact = earliestDateVal.replace(/-/g, '');
+    var dateParts = earliestDateVal.split('-');
+    var eYear = parseInt(dateParts[0], 10);
+    var eMonth = parseInt(dateParts[1], 10) - 1;
+    var eDay = parseInt(dateParts[2], 10);
     
-    var shoppingListDocName = earliestDateCompact + " - Shopping List";
-    var shoppingListDoc = DocumentApp.create(shoppingListDocName);
-    var slBody = shoppingListDoc.getBody();
+    var groceryStartTime = new Date(eYear, eMonth, eDay, 9, 0, 0);
+    var groceryEndTime = new Date(eYear, eMonth, eDay, 10, 0, 0);
     
-    slBody.appendParagraph("Consolidated Weekly Shopping List").setHeading(DocumentApp.ParagraphHeading.HEADING1);
-    slBody.appendParagraph("Scheduled Start Date: " + earliestDateVal).setItalic(true);
-    slBody.appendParagraph("Diners Scaled For: " + prefs.dinersCount).setBold(true);
-    slBody.appendParagraph("Recipes included: " + rawSelectedRecipes.map(function(r) { return r.name; }).join(", "));
-    
-    slBody.appendParagraph("Items to Buy by Store Section").setHeading(DocumentApp.ParagraphHeading.HEADING2);
-    
-    // Group items by category for document rendering
+    // Group items by aisle category for calendar description
     var categorizedItems = {};
     AISLE_CATEGORIES.forEach(function(cat) { categorizedItems[cat] = []; });
     
@@ -1275,25 +1204,34 @@ function approveMealPlanServer(approvedMealsWithDates) {
       categorizedItems[cat].push(item);
     });
     
+    var groceryDescLines = [
+      "Weekly Meal Plan Grocery Shopping List",
+      "Start Date: " + earliestDateVal,
+      "Diners: " + prefs.dinersCount,
+      "Recipes: " + rawSelectedRecipes.map(function(r) { return r.name; }).join(", "),
+      "",
+      "===============================",
+      "ITEMS BY STORE SECTION",
+      "==============================="
+    ];
+    
     AISLE_CATEGORIES.forEach(function(cat) {
       var items = categorizedItems[cat] || [];
       if (items.length > 0) {
-        slBody.appendParagraph(cat).setHeading(DocumentApp.ParagraphHeading.HEADING3);
+        groceryDescLines.push("");
+        groceryDescLines.push(cat);
         items.forEach(function(item) {
           var amountStr = item.amounts.map(function(a) { return a.amount + " " + a.unit; }).join(", ");
-          slBody.appendListItem(item.name.charAt(0).toUpperCase() + item.name.slice(1) + ": " + amountStr);
+          groceryDescLines.push("• " + item.name.charAt(0).toUpperCase() + item.name.slice(1) + ": " + amountStr);
         });
       }
     });
     
-    shoppingListDoc.saveAndClose();
-    
-    // Move to Subfolder "Shopping Lists"
-    var slFile = DriveApp.getFileById(shoppingListDoc.getId());
-    slFile.moveTo(shoppingListFolder);
-    
-    executionResult.shoppingListDocUrl = shoppingListDoc.getUrl();
-    executionResult.shoppingListDocName = shoppingListDocName;
+    calendar.createEvent("🛒 Groceries", groceryStartTime, groceryEndTime, {
+      description: groceryDescLines.join("\n"),
+      location: "Grocery Store"
+    });
+    executionResult.groceriesEventCreated = true;
     executionResult.shoppingList = consolidatedList;
     
     // Save state back to DB
@@ -1311,61 +1249,128 @@ function approveMealPlanServer(approvedMealsWithDates) {
 }
 
 /**
- * Reads the "Meal Plan Recipes" folder and extracts recipe history and top rated favorites.
- * Returns both the 25 most recently scheduled recipes and the 25 highest-rated recipes.
+ * Creates a standalone Google Doc on demand for a given recipe stored in db.recipeLibrary.
+ * Saves document in "Meal Plan Recipes" folder in Drive and caches docUrl/docId in database.
+ */
+function createRecipeDocServer(recipeName) {
+  try {
+    recipeName = String(recipeName || "").trim();
+    if (!recipeName) throw new Error("Recipe name is required.");
+    
+    var file = getDatabaseFile();
+    var db = JSON.parse(file.getBlob().getDataAsString());
+    var library = db.recipeLibrary || {};
+    var recipe = library[recipeName];
+    
+    if (!recipe) {
+      throw new Error("Recipe '" + recipeName + "' not found in recipe library.");
+    }
+    
+    // Check if doc already exists and is active
+    if (recipe.docUrl && recipe.docId) {
+      try {
+        var existingFile = DriveApp.getFileById(recipe.docId);
+        if (existingFile && !existingFile.isTrashed()) {
+          return { success: true, docUrl: recipe.docUrl, docId: recipe.docId };
+        }
+      } catch (e) {
+        // Document missing or trashed, recreate
+      }
+    }
+    
+    var parentFolder = getOrCreateFolder(PARENT_FOLDER_NAME);
+    var datePrefix = recipe.lastScheduledDate ? recipe.lastScheduledDate.replace(/-/g, '') : new Date().toISOString().substring(0, 10).replace(/-/g, '');
+    var docName = datePrefix + " - " + recipe.name;
+    
+    var doc = DocumentApp.create(docName);
+    var body = doc.getBody();
+    
+    body.appendParagraph(recipe.name).setHeading(DocumentApp.ParagraphHeading.HEADING1);
+    if (recipe.description) {
+      body.appendParagraph(recipe.description).setItalic(true);
+    }
+    body.appendParagraph("Prep Time: " + (recipe.prepTime || "15m") + " | Cook Time: " + (recipe.cookTime || "20m"));
+    body.appendParagraph("Diners Scaled For: " + (recipe.originalDiners || db.preferences.dinersCount || 2)).setBold(true);
+    
+    body.appendParagraph("Ingredients").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    (recipe.ingredients || []).forEach(function(ing) {
+      body.appendListItem(ing.amount + " " + ing.unit + " " + ing.name);
+    });
+    
+    body.appendParagraph("Instructions").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    (recipe.instructions || []).forEach(function(step, stepIdx) {
+      body.appendListItem((stepIdx + 1) + ". " + step);
+    });
+    
+    doc.saveAndClose();
+    
+    var docFile = DriveApp.getFileById(doc.getId());
+    docFile.moveTo(parentFolder);
+    
+    var docUrl = doc.getUrl();
+    var docId = doc.getId();
+    
+    recipe.docUrl = docUrl;
+    recipe.docId = docId;
+    db.recipeLibrary[recipeName] = recipe;
+    db.lastUpdated = new Date().toISOString();
+    file.setContent(JSON.stringify(db, null, 2));
+    
+    return { success: true, docUrl: docUrl, docId: docId };
+  } catch (e) {
+    Logger.log("Error creating recipe doc on demand: " + e.toString());
+    throw new Error("Failed to create recipe document: " + e.message);
+  }
+}
+
+/**
+ * Reads recipe history and top rated favorites directly from db.recipeLibrary.
+ * Returns up to 50 most recently scheduled recipes and 50 highest-rated favorites.
  */
 function getRecipeHistory() {
   try {
     var file = getDatabaseFile();
     var db = JSON.parse(file.getBlob().getDataAsString());
     var ratingsMap = db.recipeRatings || {};
+    var library = db.recipeLibrary || {};
     
-    var parentFolder = getOrCreateFolder(PARENT_FOLDER_NAME);
-    var files = parentFolder.getFiles();
     var allRecipes = [];
-    
-    while (files.hasNext()) {
-      var f = files.next();
-      var fileName = f.getName();
+    for (var recipeName in library) {
+      var item = library[recipeName];
+      var ratingInfo = ratingsMap[recipeName];
+      var isFav = (ratingInfo && (ratingInfo.isFavorite === true || ratingInfo.rating > 0)) ? true : false;
+      var recipeRating = isFav ? 5 : (ratingInfo && typeof ratingInfo.rating === 'number' ? ratingInfo.rating : 0);
       
-      // Look for recipe filename pattern: YYYYMMDD - Recipe Name
-      var match = fileName.match(/^(\d{8})\s*-\s*(.+)$/);
-      if (match) {
-        var rawDate = match[1];
-        var recipeName = match[2];
-        
-        // Format to YYYY-MM-DD
-        var formattedDate = rawDate.substring(0, 4) + "-" + rawDate.substring(4, 6) + "-" + rawDate.substring(6, 8);
-        var scheduledTimestamp = new Date(
-          parseInt(rawDate.substring(0, 4), 10),
-          parseInt(rawDate.substring(4, 6), 10) - 1,
-          parseInt(rawDate.substring(6, 8), 10)
-        ).getTime();
-        
-        var ratingInfo = ratingsMap[recipeName];
-        var isFav = (ratingInfo && (ratingInfo.isFavorite === true || ratingInfo.rating > 0)) ? true : false;
-        var recipeRating = isFav ? 5 : (ratingInfo && typeof ratingInfo.rating === 'number' ? ratingInfo.rating : 0);
-          
-        allRecipes.push({
-          name: recipeName,
-          date: formattedDate,
-          rawDate: rawDate,
-          url: f.getUrl(),
-          fileId: f.getId(),
-          isFavorite: isFav,
-          rating: recipeRating,
-          createdTime: f.getDateCreated().getTime(),
-          scheduledTime: scheduledTimestamp
-        });
+      var scheduledTimestamp = 0;
+      if (item.lastScheduledDate) {
+        var parts = String(item.lastScheduledDate).split('-');
+        if (parts.length === 3) {
+          scheduledTimestamp = new Date(
+            parseInt(parts[0], 10),
+            parseInt(parts[1], 10) - 1,
+            parseInt(parts[2], 10)
+          ).getTime();
+        }
       }
+      
+      allRecipes.push({
+        name: item.name,
+        date: item.lastScheduledDate || "Previously Planned",
+        description: item.description || "",
+        prepTime: item.prepTime || "",
+        cookTime: item.cookTime || "",
+        url: item.docUrl || "",
+        docUrl: item.docUrl || "",
+        fileId: item.docId || "",
+        isFavorite: isFav,
+        rating: recipeRating,
+        scheduledTime: scheduledTimestamp
+      });
     }
     
-    // Sort for Recipe History: Most recent scheduled date first, then creation time descending
+    // Sort for Recipe History: Most recent scheduled date first
     var historyList = allRecipes.slice().sort(function(a, b) {
-      if (b.scheduledTime !== a.scheduledTime) {
-        return b.scheduledTime - a.scheduledTime;
-      }
-      return b.createdTime - a.createdTime;
+      return b.scheduledTime - a.scheduledTime;
     });
     
     // Sort for Past Favorites: Filter recipes with isFavorite === true (or rating > 0)
@@ -1375,17 +1380,14 @@ function getRecipeHistory() {
       if (b.rating !== a.rating) {
         return b.rating - a.rating;
       }
-      if (b.scheduledTime !== a.scheduledTime) {
-        return b.scheduledTime - a.scheduledTime;
-      }
-      return b.createdTime - a.createdTime;
+      return b.scheduledTime - a.scheduledTime;
     });
     
     return {
-      history: historyList.slice(0, 25),
-      favorites: favoritesList.slice(0, 25),
+      history: historyList.slice(0, 50),
+      favorites: favoritesList.slice(0, 50),
       ratings: ratingsMap,
-      library: db.recipeLibrary || {}
+      library: library
     };
   } catch (e) {
     Logger.log("Error loading recipe history: " + e.toString());

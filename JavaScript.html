@@ -1891,32 +1891,17 @@
     </div>
   `;
 
-    // If plan is approved and fully executed, show links to generated artifacts and in-app grocery checklist
+    // If plan is approved and fully executed, show link to Google Calendar
     if (plan.approved && plan.executionResult) {
-      const res = plan.executionResult;
       html += `
       <div class="success-box">
-        <h4 class="success-title">Meal plan complete!</h4>
-        <p class="success-desc">Individual recipe instructions have been uploaded to your Google Drive, dinner prep events have been added to your Default Google Calendar, and a consolidated shopping list document has been compiled.</p>
+        <h4 class="success-title">Meal plan scheduled on Google Calendar!</h4>
+        <p class="success-desc">Individual recipe instructions and your categorized grocery list have been added directly to your Default Google Calendar events.</p>
         <div class="success-links">
-          <a href="#shopping-list-section" class="doc-link" onclick="scrollToShoppingList(event)">🛒 In-App Grocery Checklist</a>
-          <a href="${res.shoppingListDocUrl}" target="_blank" class="doc-link">📄 Open Drive Doc (${res.shoppingListDocName})</a>
           <a href="https://calendar.google.com" target="_blank" class="doc-link">📅 Open Google Calendar</a>
         </div>
       </div>
     `;
-
-      // Render In-App Interactive Grocery Checklist (MPA-13)
-      html += renderShoppingListHtml(plan);
-
-      html += `
-      <div style="font-size: 14px; font-weight:600; margin-bottom: 16px; text-transform: uppercase; color:var(--text-muted);">Generated Recipe Documents</div>
-      <div class="success-links" style="justify-content: flex-start; margin-bottom: 32px;">
-    `;
-      res.recipeDocs.forEach(doc => {
-        html += `<a href="${doc.url}" target="_blank" class="doc-link">📄 [${doc.date}] ${doc.name}</a>`;
-      });
-      html += `</div>`;
     }
 
     // Render Recipe Cards Grid
@@ -2606,9 +2591,10 @@
               title="Insert recipe into active weekly meal plan">
               <span>➕ Add to Plan</span>
             </button>
-            <a href="${escapeHtml(item.url)}" target="_blank" class="doc-link">
-              Open Recipe
-            </a>
+            ${(item.docUrl || item.url)
+              ? `<a href="${escapeHtml(item.docUrl || item.url)}" target="_blank" class="doc-link" title="Open Google Doc">📄 Open Doc</a>`
+              : `<button type="button" class="doc-link" style="background:none; border: 1px solid var(--accent-secondary); color: var(--accent-secondary); cursor: pointer; padding: 4px 10px; border-radius: 4px; font-size: 13px;" onclick="handleCreateRecipeDoc(event, '${escapeJSString(item.name)}')" title="Generate a Google Doc for this recipe">📄 Create Recipe</button>`
+            }
           </div>
         </div>
       `;
@@ -2616,5 +2602,47 @@
 
     html += `</div>`;
     els.historyContainer.innerHTML = html;
+  }
+
+  /**
+   * On-demand generation of Google Doc for a recipe from History / Favorites
+   */
+  function handleCreateRecipeDoc(event, recipeName) {
+    if (event) event.stopPropagation();
+    const btn = event ? event.currentTarget : null;
+    const originalHtml = btn ? btn.innerHTML : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-spinner-inline"></span> Creating...`;
+    }
+
+    showToast(`Creating Google Doc for "${recipeName}"...`);
+
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.success && res.docUrl) {
+          showToast(`✓ Google Doc created for "${recipeName}"!`);
+          if (appState.historyData && appState.historyData.library && appState.historyData.library[recipeName]) {
+            appState.historyData.library[recipeName].docUrl = res.docUrl;
+            appState.historyData.library[recipeName].docId = res.docId;
+          }
+          window.open(res.docUrl, '_blank');
+          renderHistoryList();
+        } else {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+          }
+          showToast("Could not create recipe document.", true);
+        }
+      })
+      .withFailureHandler(function (err) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHtml;
+        }
+        showToast("Error creating recipe document: " + err.message, true);
+      })
+      .createRecipeDocServer(recipeName);
   }
 </script>
