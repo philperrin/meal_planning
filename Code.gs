@@ -95,6 +95,61 @@ function loadAppData() {
       updated = true;
     }
     
+    // Auto-migrate recipeLibrary if stored as Array
+    if (Array.isArray(db.recipeLibrary)) {
+      var libMap = {};
+      db.recipeLibrary.forEach(function(item) {
+        if (item && item.name) {
+          libMap[item.name] = item;
+        }
+      });
+      db.recipeLibrary = libMap;
+      updated = true;
+    }
+
+    // Auto-ingest any recipes in active meal plan if missing from recipeLibrary
+    if (db.mealPlan && Array.isArray(db.mealPlan.recipes)) {
+      var planDate = db.mealPlan.generatedAt ? db.mealPlan.generatedAt.substring(0, 10) : new Date().toISOString().substring(0, 10);
+      db.mealPlan.recipes.forEach(function(r) {
+        if (r && r.name && !db.recipeLibrary[r.name]) {
+          db.recipeLibrary[r.name] = {
+            name: r.name,
+            description: r.description || "",
+            prepTime: r.prepTime || "15m",
+            cookTime: r.cookTime || "20m",
+            ingredients: r.ingredients || [],
+            instructions: r.instructions || [],
+            docUrl: r.docUrl || r.url || "",
+            docId: r.docId || r.fileId || "",
+            originalDiners: (db.preferences && db.preferences.dinersCount) || 2,
+            lastScheduledDate: r.lastScheduledDate || r.date || planDate
+          };
+          updated = true;
+        }
+      });
+    }
+
+    // Auto-ingest recipes from db.recipeRatings if missing from recipeLibrary
+    if (db.recipeRatings && typeof db.recipeRatings === 'object') {
+      for (var rKey in db.recipeRatings) {
+        if (rKey && !db.recipeLibrary[rKey]) {
+          db.recipeLibrary[rKey] = {
+            name: rKey,
+            description: "Favorite family recipe.",
+            prepTime: "20m",
+            cookTime: "30m",
+            ingredients: [],
+            instructions: [],
+            docUrl: "",
+            docId: "",
+            originalDiners: (db.preferences && db.preferences.dinersCount) || 2,
+            lastScheduledDate: new Date().toISOString().substring(0, 10)
+          };
+          updated = true;
+        }
+      }
+    }
+    
     if (updated) {
       file.setContent(JSON.stringify(db, null, 2));
     }
@@ -366,6 +421,23 @@ function saveActiveMealPlanServer(recipesList) {
     }
     
     db.mealPlan.recipes = recipesList;
+    if (!db.recipeLibrary) db.recipeLibrary = {};
+    recipesList.forEach(function(recipe) {
+      if (recipe && recipe.name && !db.recipeLibrary[recipe.name]) {
+        db.recipeLibrary[recipe.name] = {
+          name: recipe.name,
+          description: recipe.description || "",
+          prepTime: recipe.prepTime || "15m",
+          cookTime: recipe.cookTime || "20m",
+          ingredients: recipe.ingredients || [],
+          instructions: recipe.instructions || [],
+          docUrl: recipe.docUrl || recipe.url || "",
+          docId: recipe.docId || recipe.fileId || "",
+          originalDiners: (db.preferences && db.preferences.dinersCount) || 2,
+          lastScheduledDate: recipe.lastScheduledDate || recipe.date || new Date().toISOString().substring(0, 10)
+        };
+      }
+    });
     db.lastUpdated = new Date().toISOString();
     file.setContent(JSON.stringify(db, null, 2));
     
@@ -908,6 +980,24 @@ function generateMealPlanServer(mealCount, planPreferences, reusedRecipeNames, s
       generatedAt: new Date().toISOString(),
       executionResult: null
     };
+    if (!db.recipeLibrary) db.recipeLibrary = {};
+    var genDate = new Date().toISOString().substring(0, 10);
+    finalRecipes.forEach(function(recipe) {
+      if (recipe && recipe.name && !db.recipeLibrary[recipe.name]) {
+        db.recipeLibrary[recipe.name] = {
+          name: recipe.name,
+          description: recipe.description || "",
+          prepTime: recipe.prepTime || "15m",
+          cookTime: recipe.cookTime || "20m",
+          ingredients: recipe.ingredients || [],
+          instructions: recipe.instructions || [],
+          docUrl: recipe.docUrl || recipe.url || "",
+          docId: recipe.docId || recipe.fileId || "",
+          originalDiners: (db.preferences && db.preferences.dinersCount) || 2,
+          lastScheduledDate: recipe.lastScheduledDate || recipe.date || genDate
+        };
+      }
+    });
     if (!db.preferences) db.preferences = {};
     db.preferences.pantryIngredients = pantryIngredients;
     db.lastUpdated = new Date().toISOString();
@@ -1333,6 +1423,106 @@ function getRecipeHistory() {
     var db = JSON.parse(file.getBlob().getDataAsString());
     var ratingsMap = db.recipeRatings || {};
     var library = db.recipeLibrary || {};
+    var updated = false;
+    
+    // 1. If library is an Array, normalize to Object
+    if (Array.isArray(library)) {
+      var libObj = {};
+      library.forEach(function(item) {
+        if (item && item.name) {
+          libObj[item.name] = item;
+        }
+      });
+      library = libObj;
+      db.recipeLibrary = library;
+      updated = true;
+    }
+    
+    // 2. Auto-ingest any active or past recipes from db.mealPlan.recipes
+    if (db.mealPlan && Array.isArray(db.mealPlan.recipes)) {
+      var planDate = db.mealPlan.generatedAt ? db.mealPlan.generatedAt.substring(0, 10) : new Date().toISOString().substring(0, 10);
+      db.mealPlan.recipes.forEach(function(r) {
+        if (r && r.name && !library[r.name]) {
+          library[r.name] = {
+            name: r.name,
+            description: r.description || "",
+            prepTime: r.prepTime || "15m",
+            cookTime: r.cookTime || "20m",
+            ingredients: r.ingredients || [],
+            instructions: r.instructions || [],
+            docUrl: r.docUrl || r.url || "",
+            docId: r.docId || r.fileId || "",
+            originalDiners: (db.preferences && db.preferences.dinersCount) || 2,
+            lastScheduledDate: r.lastScheduledDate || r.date || planDate
+          };
+          updated = true;
+        }
+      });
+    }
+    
+    // 3. Auto-ingest any recipes from db.recipeRatings missing in library
+    for (var favName in ratingsMap) {
+      if (favName && !library[favName]) {
+        library[favName] = {
+          name: favName,
+          description: "Favorite family recipe.",
+          prepTime: "20m",
+          cookTime: "30m",
+          ingredients: [],
+          instructions: [],
+          docUrl: "",
+          docId: "",
+          originalDiners: (db.preferences && db.preferences.dinersCount) || 2,
+          lastScheduledDate: new Date().toISOString().substring(0, 10)
+        };
+        updated = true;
+      }
+    }
+    
+    // 4. Auto-discover legacy Google Docs in Drive parent folder ("Meal Plan Recipes")
+    try {
+      var parentFolder = getOrCreateFolder(PARENT_FOLDER_NAME);
+      var files = parentFolder.getFiles();
+      while (files.hasNext()) {
+        var f = files.next();
+        var fileName = f.getName();
+        var match = fileName.match(/^(\d{8})\s*-\s*(.+)$/);
+        if (match) {
+          var rawDate = match[1];
+          var docRecipeName = match[2];
+          var formattedDate = rawDate.substring(0, 4) + "-" + rawDate.substring(4, 6) + "-" + rawDate.substring(6, 8);
+          if (!library[docRecipeName]) {
+            library[docRecipeName] = {
+              name: docRecipeName,
+              description: "Recipe from Google Drive archive.",
+              prepTime: "20m",
+              cookTime: "30m",
+              ingredients: [],
+              instructions: [],
+              docUrl: f.getUrl(),
+              docId: f.getId(),
+              originalDiners: (db.preferences && db.preferences.dinersCount) || 2,
+              lastScheduledDate: formattedDate
+            };
+            updated = true;
+          } else {
+            if (!library[docRecipeName].docUrl) {
+              library[docRecipeName].docUrl = f.getUrl();
+              library[docRecipeName].docId = f.getId();
+              updated = true;
+            }
+          }
+        }
+      }
+    } catch (driveErr) {
+      Logger.log("Drive scan note: " + driveErr.toString());
+    }
+    
+    if (updated) {
+      db.recipeLibrary = library;
+      db.lastUpdated = new Date().toISOString();
+      file.setContent(JSON.stringify(db, null, 2));
+    }
     
     var allRecipes = [];
     for (var recipeName in library) {
@@ -1354,7 +1544,7 @@ function getRecipeHistory() {
       }
       
       allRecipes.push({
-        name: item.name,
+        name: item.name || recipeName,
         date: item.lastScheduledDate || "Previously Planned",
         description: item.description || "",
         prepTime: item.prepTime || "",

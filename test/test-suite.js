@@ -789,6 +789,29 @@ describe('8. Recipe Favorites & History Management (MPA-8 & MPA-15)', () => {
     assertEqual(docRes.success, true, 'createRecipeDocServer should succeed');
     assert(docRes.docUrl.includes('mock-doc-id'), 'docUrl should be generated');
     assertEqual(context.getMockDbState().recipeLibrary['Fresh Tacos'].docId, 'mock-doc-id');
+
+    // 6. Test auto-ingest / backfill when recipeLibrary is empty or array but mealPlan.recipes and recipeRatings exist
+    const legacyDb = {
+      preferences: { dinersCount: 2 },
+      mealPlan: {
+        generatedAt: "2026-09-18T12:00:00.000Z",
+        recipes: [
+          { name: "Spaghetti Bolognese", description: "Rich meat sauce", ingredients: [], instructions: [] },
+          { name: "Thai Green Curry", description: "Aromatic curry", ingredients: [], instructions: [] }
+        ]
+      },
+      recipeRatings: {
+        "Grandma's Pot Roast": { isFavorite: true, rating: 5 }
+      },
+      recipeLibrary: [] // Legacy array format
+    };
+    const legacyContext = createMockGasContext(legacyDb);
+    const legacyResult = legacyContext.getRecipeHistory();
+    assert(legacyResult.history.length >= 3, 'History should ingest from mealPlan.recipes and recipeRatings');
+    assert(legacyResult.library['Spaghetti Bolognese'] !== undefined, 'Spaghetti Bolognese should be in library');
+    assert(legacyResult.library['Thai Green Curry'] !== undefined, 'Thai Green Curry should be in library');
+    assert(legacyResult.library["Grandma's Pot Roast"] !== undefined, "Grandma's Pot Roast should be in library");
+    assert(legacyResult.favorites.some(f => f.name === "Grandma's Pot Roast"), "Grandma's Pot Roast should be in favorites");
   });
 });
 

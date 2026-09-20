@@ -1960,7 +1960,7 @@
                 </div>
               ` : ''}
               <button type="button" class="favorite-btn ${isFav ? 'active' : ''}" 
-                onclick="handleToggleFavorite(event, '${escapeJSString(recipe.name)}', ${escapeJSString(JSON.stringify(recipe))})"
+                onclick="handleToggleFavorite(event, '${escapeJSString(recipe.name)}', ${idx})"
                 title="${isFav ? 'Family Favorite' : 'Star / Bookmark Recipe'}">
                 <span class="star-icon">${isFav ? '★' : '☆'}</span>
                 <span>${isFav ? 'Favorite' : 'Star'}</span>
@@ -2305,8 +2305,25 @@
   /**
    * Handle single-star favorite toggle on a recipe
    */
-  function handleToggleFavorite(event, recipeName, recipeObj) {
+  function handleToggleFavorite(event, recipeName, recipeObjOrIdx) {
     if (event) event.stopPropagation();
+
+    let recipeObj = null;
+    if (typeof recipeObjOrIdx === 'object' && recipeObjOrIdx !== null) {
+      recipeObj = recipeObjOrIdx;
+    } else if (typeof recipeObjOrIdx === 'number') {
+      if (appState.db.mealPlan && Array.isArray(appState.db.mealPlan.recipes)) {
+        recipeObj = appState.db.mealPlan.recipes[recipeObjOrIdx];
+      }
+    }
+    if (!recipeObj) {
+      if (appState.db.mealPlan && Array.isArray(appState.db.mealPlan.recipes)) {
+        recipeObj = appState.db.mealPlan.recipes.find(r => r && r.name === recipeName);
+      }
+      if (!recipeObj && appState.db.recipeLibrary && appState.db.recipeLibrary[recipeName]) {
+        recipeObj = appState.db.recipeLibrary[recipeName];
+      }
+    }
 
     // Determine current favorite status
     const currentInfo = (appState.historyData.ratings && appState.historyData.ratings[recipeName]) || (appState.db.recipeRatings && appState.db.recipeRatings[recipeName]);
@@ -2323,7 +2340,7 @@
     if (!appState.db.recipeRatings) appState.db.recipeRatings = {};
     appState.db.recipeRatings[recipeName] = appState.historyData.ratings[recipeName];
 
-    // Cache recipe into library if object passed
+    // Cache recipe into library if object resolved
     if (recipeObj && typeof recipeObj === 'object') {
       if (!appState.db.recipeLibrary) appState.db.recipeLibrary = {};
       if (!appState.historyData.library) appState.historyData.library = {};
@@ -2347,8 +2364,8 @@
     appState.historyData.favorites = Array.from(favSet.values()).sort((a, b) => {
       if (b.rating !== a.rating) return b.rating - a.rating;
       if (b.scheduledTime !== a.scheduledTime) return b.scheduledTime - a.scheduledTime;
-      return b.createdTime - a.createdTime;
-    }).slice(0, 25);
+      return (b.createdTime || 0) - (a.createdTime || 0);
+    }).slice(0, 50);
 
     // Update subtab badges
     if (els.badgeRecentCount) els.badgeRecentCount.textContent = appState.historyData.history.length;
@@ -2394,7 +2411,7 @@
     return `
       <button type="button" class="favorite-btn ${isFav ? 'active' : ''}" 
         onclick="handleToggleFavorite(event, '${escapeJSString(recipeName)}')"
-        title="${isFav ? 'Remove from Family Favorites' : 'Add to Family Favorites'}">
+        title="${isFav ? 'Family Favorite' : 'Star / Bookmark Recipe'}">
         <span class="star-icon">${isFav ? '★' : '☆'}</span>
         <span>${isFav ? 'Favorite' : 'Star'}</span>
       </button>
@@ -2409,75 +2426,75 @@
   }
 
   /**
-   * 1-Click Insert a favorite/history recipe into the active meal plan grid
+   * Quick-add a recipe from History or Favorites directly into the active meal plan (MPA-15)
    */
   function handleQuickAddToPlan(event, recipeName) {
     if (event) event.stopPropagation();
 
-    // Retrieve recipe definition from library or history
-    const library = (appState.historyData && appState.historyData.library) || (appState.db && appState.db.recipeLibrary) || {};
-    let recipe = library[recipeName];
+    // Look up structured recipe from recipeLibrary or historyData
+    let recipe = (appState.db.recipeLibrary && appState.db.recipeLibrary[recipeName]) ||
+                 (appState.historyData.library && appState.historyData.library[recipeName]);
 
     if (!recipe) {
-      // Fallback recipe object
-      recipe = {
-        name: recipeName,
-        description: "Classic home favorite from your recipe history.",
-        prepTime: "20 mins",
-        cookTime: "30 mins",
-        ingredients: [
-          { name: "main ingredients (see doc)", amount: 1, unit: "recipe" }
-        ],
-        instructions: [
-          "Follow instructions in the linked Google Doc."
-        ],
-        originalDiners: parseInt(appState.db.preferences.dinersCount, 10) || 2,
-        isReused: true
-      };
+      const histItem = (appState.historyData.history || []).find(h => h.name === recipeName) ||
+                       (appState.historyData.favorites || []).find(f => f.name === recipeName);
+      if (histItem) {
+        recipe = {
+          name: histItem.name,
+          description: histItem.description || "Favorite recipe from history.",
+          prepTime: histItem.prepTime || "20 mins",
+          cookTime: histItem.cookTime || "30 mins",
+          ingredients: [],
+          instructions: [],
+          docUrl: histItem.docUrl || histItem.url || "",
+          docId: histItem.fileId || ""
+        };
+      }
     }
 
-    // Deep clone so diner scaling doesn't mutate cached original
-    const clonedRecipe = JSON.parse(JSON.stringify(recipe));
-    clonedRecipe.isReused = true;
-
-    // Scale ingredients to current household diners
-    const origDiners = parseInt(clonedRecipe.originalDiners, 10) || parseInt(appState.db.preferences.dinersCount, 10) || 2;
-    const currDiners = parseInt(appState.db.preferences.dinersCount, 10) || 2;
-    if (origDiners !== currDiners && Array.isArray(clonedRecipe.ingredients)) {
-      clonedRecipe.ingredients.forEach(ing => {
-        if (typeof ing.amount === 'number') {
-          ing.amount = Math.round((ing.amount * currDiners / origDiners) * 100) / 100;
-        }
-      });
-      clonedRecipe.originalDiners = currDiners;
+    if (!recipe) {
+      showToast(`Cannot find details for "${recipeName}".`, true);
+      return;
     }
 
-    // Initialize or modify meal plan
-    if (!appState.db.mealPlan || appState.db.mealPlan.approved) {
+    if (!appState.db.mealPlan) {
       appState.db.mealPlan = {
-        generatedAt: new Date().toISOString(),
+        recipes: [],
         approved: false,
-        recipes: []
+        generatedAt: new Date().toISOString(),
+        selectedTags: [],
+        pantryIngredients: [],
+        lockedIndices: []
       };
     }
 
-    // Check if recipe already in active plan
-    const alreadyExists = appState.db.mealPlan.recipes.some(r => r.name.toLowerCase() === recipeName.toLowerCase());
-    if (alreadyExists) {
-      showToast(`"${recipeName}" is already in your active weekly plan.`);
+    // Check if recipe already exists in active plan
+    const alreadyInPlan = appState.db.mealPlan.recipes.some(r => r.name === recipe.name);
+    if (alreadyInPlan) {
+      showToast(`"${recipe.name}" is already in your active weekly plan.`);
       switchView('planner');
       return;
     }
 
-    appState.db.mealPlan.recipes.push(clonedRecipe);
-    renderMealPlan();
+    // Clone recipe to avoid reference mutations
+    const clonedRecipe = JSON.parse(JSON.stringify(recipe));
+    clonedRecipe.isReused = true;
 
-    showToast(`✨ Added "${recipeName}" to this week's plan!`);
-    switchView('planner');
+    // Add to active recipes
+    appState.db.mealPlan.recipes.push(clonedRecipe);
+
+    // If plan was previously approved, unapprove it to prompt re-execution
+    appState.db.mealPlan.approved = false;
 
     // Persist updated plan to server
     google.script.run
-      .withFailureHandler(err => console.error("Failed to sync plan update: " + err.message))
+      .withSuccessHandler(res => {
+        showToast(`✓ Added "${recipe.name}" to your active meal plan!`);
+        switchView('planner');
+      })
+      .withFailureHandler(err => {
+        showToast("Error updating meal plan: " + err.message, true);
+      })
       .saveActiveMealPlanServer(appState.db.mealPlan.recipes);
   }
 
@@ -2488,7 +2505,7 @@
     els.historyContainer.innerHTML = `
       <div style="display:flex; justify-content:center; align-items:center; padding: 32px;">
         <div class="loader" style="width:32px; height:32px; border-width:3px; margin-bottom:0; margin-right: 12px;"></div>
-        <span style="font-size:14px; color:var(--text-secondary);">Querying Google Drive folder...</span>
+        <span style="font-size:14px; color:var(--text-secondary);">Retrieving recipe history...</span>
       </div>
     `;
 
