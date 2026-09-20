@@ -1136,12 +1136,16 @@
     align-items: center;
     gap: 12px;
     z-index: 1000;
-    transform: translateY(150%);
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.25s ease, visibility 0.25s ease;
     pointer-events: none;
   }
 
   .toast.show {
+    opacity: 1;
+    visibility: visible;
     transform: translateY(0);
     pointer-events: auto;
   }
