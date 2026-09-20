@@ -350,9 +350,9 @@
                 style="color:var(--accent-secondary);">Automated_Meal_Planner_DB.json</strong> file. No external
               database or unauthorized party can access your information.</li>
             <li><strong>AI Generation & Processing:</strong> When generating meal plans or recipes, only the necessary
-              planning criteria (dietary restrictions, diner count, preferred/avoided cuisines, and requested meal
-              count) are sent securely to Google's Gemini API (<code>generativelanguage.googleapis.com</code>). No
-              identity credentials, emails, or unrelated files are transmitted.</li>
+              planning criteria (allergy constraints, dietary & cuisine preferences, diner count, per-plan notes, and
+              requested meal count) are sent securely to Google's Gemini API (<code>generativelanguage.googleapis.com</code>).
+              No identity credentials, emails, or unrelated files are transmitted.</li>
             <li><strong>Starter vs. Personal API Key:</strong> The default starter key runs on Google AI Studio's free
               tier. If you provide your own personal Gemini API key, all AI requests are processed directly against
               your
@@ -374,12 +374,11 @@
           </p>
           <ul
             style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
-            <li>Prep & cook events scheduled on your default Google Calendar with complete recipe details and
-              instructions in the event description.</li>
-            <li>A dedicated <strong>Groceries</strong> event on your Google Calendar containing your complete grocery
-              list organized by store section.</li>
+            <li>Prep & cook events scheduled on your default Google Calendar with complete recipe details, scaled ingredients, and cooking instructions in the event description.</li>
+            <li>A dedicated <strong>🛒 Groceries</strong> checklist event on your Google Calendar containing your complete grocery list organized by store section.</li>
           </ul>
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 12px;">
+            Individual Google Docs can also be created on-demand anytime from the <strong>History & Favorites</strong> tab.<br>
             The Meal Planning Assistant was developed by Phil at
             <a href="https://milehighdataviz.com" target="_blank">Mile High Data Viz</a>.<br>
             For questions or feedback, contact Phil at <a

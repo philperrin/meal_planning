@@ -1,54 +1,55 @@
 # Meal Planning Assistant
 
-A Google Apps Script-based web application that automates meal planning using Google Gemini AI, creating personalized weekly meal plans with shopping lists and calendar integration.
+A Google Apps Script-based web application that automates meal planning using Google Gemini AI, creating personalized weekly meal plans with calendar integration, smart grocery checklists, and on-demand recipe documents.
 
 ## Overview
 
 This application helps you plan weekly meals by:
-- **Generating AI-powered meal plans** using Google Gemini's generative AI
-- **Respecting dietary preferences** including allergies, dietary restrictions, cuisine styles, and specific requests for each plan
-- **Creating organized documentation** with individual recipe documents and consolidated shopping lists
-- **Integrating with Google Calendar** for meal prep scheduling
-- **Storing meal history** in Google Drive for future reference
+- **Generating AI-powered meal plans** using Google Gemini 2.5 Flash (`gemini-2.5-flash`)
+- **Respecting dietary preferences** including allergies & sensitivities, natural-language dietary and cuisine styles, mood/constraint quick presets, and per-plan custom requests
+- **Calendar-First execution** by automatically scheduling dinner events on your Google Calendar with complete recipes, ingredients, and cooking instructions embedded in descriptions, plus a consolidated morning **🛒 Groceries** checklist event organized by grocery aisle
+- **On-Demand Google Docs** created directly from Recipe History or Family Favorites whenever you need permanent documents, eliminating Google Drive clutter
+- **Storing meal history and family favorites** in Google Drive (`Automated_Meal_Planner_DB.json`) with 1-click staple meal re-use
 
 ## Features
 
 ### 🍽️ Personalized Meal Planning
-- Set dietary allergies and preferences
-- Configure **Cuisine & Meal Style Preferences** with 3-state controls (Prefer, Avoid, None) across 12 popular cuisine and diet styles in a clean 2-column layout
-- Specify number of diners for automatic recipe scaling
-- Add **per-plan custom preferences and ideas** directly on the Planner tab for each meal plan generation
-- Set default meal preparation time
+- Set allergy and sensitivity constraints to strictly avoid
+- Unified natural-language **Dietary & Cuisine Preferences** (e.g., *"Prefer Mediterranean, Mexican, and Italian cuisines. High protein, lean meats, plenty of vegetables..."*)
+- One-click **Quick Presets** (`⚡ 20-30 Min Quick Meals`, `🥘 One-Pot`, `👶 Kid-Friendly`, `❄️ Slow Cooker`, `🥦 High-Veggie`, `🧀 Comfort Classics`)
+- Specify number of diners for automatic ingredient scaling
+- Add **per-plan custom notes & pantry priorities** directly on the Planner tab for each generation
+- Set default meal preparation time for calendar scheduling
+- Interactive recipe cards with card locking (`🔒`), single-recipe swapping / rerolling (`🔄`), and staple recipe insertion (`⭐ + Add to Plan`)
 
 ### 📝 Automated Recipe Generation
-- AI-powered recipe generation using Google Gemini 3.5 Flash
-- Generates exactly the number of recipes you request
+- AI-powered recipe generation using Google Gemini 2.5 Flash (`gemini-2.5-flash`) with automatic transient retry and model failover
+- Generates exactly the number of recipes requested (or partial counts when locking/reusing meals)
 - All ingredient quantities automatically scaled for your household size
-- Complete with prep time, cook time, and step-by-step instructions
+- Complete with prep time, cook time, ingredients list, and step-by-step instructions
 
-### 📄 Document Generation
-- Individual Google Docs created for each approved recipe
-- **Consolidated shopping list** automatically merged and deduplicated by ingredient
-- Documents organized in Google Drive folders
-- Organized filing by date (YYYYMMDD format)
+### 📅 Calendar-First Integration
+- Automatically creates dinner events on your primary Google Calendar at your preferred meal time
+- Full recipe details, scaled ingredients, and cooking instructions embedded directly in event descriptions
+- Dedicated morning **🛒 Groceries** event scheduled on your calendar with an aisle-categorized shopping checklist
 
-### 📅 Calendar Integration
-- Automatically creates calendar events for each meal
-- Events scheduled for your preferred meal time
-- Full recipe details embedded in event descriptions
-- Links to recipe documents included
+### 📄 On-Demand Document Generation
+- Create formatted Google Docs for any recipe on-demand directly from the **Recipe History** or **Family Favorites** tab
+- Eliminates Drive clutter by only generating documents when you want a permanent Google Doc
+- Automatically organized in your Google Drive
 
-### 📊 Recipe History
+### 📊 Recipe History & Family Favorites
 - Browse your 25 most recently created recipes
-- Access previous meal plans from Google Drive
-- Re-use approved recipes for future planning
+- Star household favorites with 1-click binary toggles (`⭐`)
+- 1-click insertion of starred staples directly into your active weekly meal plan
+- Persistent JSON database in Google Drive (`Automated_Meal_Planner_DB.json`)
 
 ## Installation & Setup
 
 ### Prerequisites
-- A Google Account with Google Drive access
+- A Google Account with Google Drive and Google Calendar access
 - Google Apps Script runtime environment
-- Gemini API key (free tier available)
+- Gemini API key (free tier available from Google AI Studio)
 
 ### Steps
 
@@ -76,95 +77,91 @@ This application helps you plan weekly meals by:
 ### Basic Workflow
 
 1. **Configure Preferences**
-   - Click **Settings**
-   - Enter your allergies (e.g., "No eggs")
-   - Add dietary preferences (e.g., "High protein, seasonal vegetables")
-   - Specify on-hand ingredients (optional)
-   - Set number of diners
-   - Set preferred meal prep time (24-hour or AM/PM format)
-   - Click **Save**
+   - Click **Preferences** (or **Settings**)
+   - Enter your allergies (e.g., "No eggs, shellfish")
+   - Add natural-language dietary and cuisine preferences (e.g., "Prefer Mediterranean and Mexican cuisines. High protein, plenty of greens")
+   - Set number of diners (all recipes scale automatically)
+   - Set preferred daily meal prep time (e.g., "06:00 PM")
+   - Click **Save Preferences**
 
-2. **Generate Meal Plan**
-   - Click **Generate Plan**
+2. **Generate & Customize Meal Plan**
+   - Open the **Planner** tab
    - Select number of dinners (default: 7)
-   - Review AI-generated recipes
-   - Approve/reject individual recipes by checking checkboxes
+   - Optionally toggle Quick Presets or enter per-plan notes/pantry items
+   - Click **Generate Plan**
+   - Tailor your plan: lock recipes you like (`🔒`), reroll individual dishes (`🔄`), or insert family staples from the **History** tab (`⭐ + Add to Plan`)
 
-3. **Approve & Execute**
-   - Select dates for approved recipes
-   - Click **Approve & Execute**
+3. **Approve & Schedule**
+   - Select or adjust dates for approved recipes
+   - Click **Approve & Schedule**
    - System automatically:
-     - Creates individual recipe documents in Google Drive
-     - Generates consolidated shopping list
-     - Creates calendar events for meal prep
+     - Saves recipes to your persistent recipe library
+     - Creates dinner events with complete recipe instructions on Google Calendar
+     - Creates a morning **🛒 Groceries** event on Google Calendar with an aisle-sorted checklist
 
-4. **Access Results**
-   - View links to all created documents in the confirmation panel
-   - Check "Meal Plan Recipes" folder in Google Drive for documents
-   - Check "Shopping Lists" subfolder for your shopping list
-   - View calendar events in Google Calendar
+4. **Access Results & On-Demand Docs**
+   - View your dinner events and grocery checklist directly in Google Calendar
+   - Whenever you want a formatted Google Doc for a recipe, open **History & Favorites** and click **📄 Create Doc**
 
 ### Settings Panel
-- **Allergies**: Specify any food allergies (e.g., "nuts, shellfish")
-- **Dietary Preferences**: Include any dietary restrictions or preferences
-- **On-Hand Ingredients**: List ingredients to prioritize in recipes
-- **Number of Diners**: All recipes automatically scale to this count
-- **Default Meal Time**: Time to schedule calendar events (e.g., "6:00 PM" or "18:00")
-- **API Key Management**: Add/update/remove Gemini API key
+- **Gemini API Key**: Add/update/remove personal Google AI Studio API key with real-time status badge
+- **Data Privacy Details**: Comprehensive documentation on local Google Drive storage and secure AI transmission
+- **App Information**: System architecture overview and developer contact links
 
 ## File Structure
 
 ```
 meal_planning/
-├── Code.gs              # Backend Apps Script code (Google Apps Script)
-├── Index.html           # Main web page template
-├── JavaScript.html      # Client-side JavaScript
-├── Styles.html          # CSS styling
-├── appsscript.json      # Apps Script configuration
-├── package.json         # NPM scripts and dependencies
+├── Code.gs              # Backend Apps Script code (database, calendar, docs, AI endpoints)
+├── Index.html           # Main HTML structure, views (Planner, History, Preferences, Settings)
+├── JavaScript.html      # Client-side JavaScript (state management, card rendering, event handlers)
+├── Styles.html          # CSS styling (matte organic palette, glassmorphism, responsive mobile rules)
+├── appsscript.json      # Apps Script manifest and OAuth scopes
+├── package.json         # NPM scripts and test runner dependencies
 ├── ship.js              # Post-commit deployment automation script
-├── spec/                # Technical specifications
-└── clasp_github_setup.md # Setup instructions for GitHub integration
+├── spec/                # Technical specifications and design documents
+├── docs/                # Product reviews and release documentation
+└── test/                # Consolidated automated test suites & Tier 1 prompt evaluation harness
 ```
 
 ## Technical Details
 
 ### Backend (Code.gs)
-- **Database**: JSON file stored in Google Drive ("Automated_Meal_Planner_DB.json")
-- **API Integration**: Google Gemini 3.5 Flash API with JSON schema validation
+- **Database**: JSON file stored in Google Drive (`Automated_Meal_Planner_DB.json`) with automated schema migrations
+- **API Integration**: Google Gemini 2.5 Flash (`gemini-2.5-flash`) API with JSON schema validation, exponential backoff retries, and fallback cascade
 - **Google Services Used**:
-  - Google Drive API (file/folder management)
-  - Google Docs API (document creation)
-  - Google Calendar API (event scheduling)
-  - Properties Service (secure API key storage)
+  - Google Calendar API (dinner scheduling & aisle-categorized grocery checklist)
+  - Google Drive API (database file & folder management)
+  - Google Docs API (on-demand document creation)
+  - Properties Service (hybrid shared/personal API key storage)
 
 ### Frontend (JavaScript.html + Styles.html)
-- Interactive meal plan review and approval interface
-- Real-time date selection for recipes
-- Shopping list preview
-- Settings management UI
+- Single-page application with responsive tab switching (Planner, History/Favorites, Preferences, Settings)
+- Mobile-first bottom navigation bar and touch-friendly targets
+- Interactive meal plan review, card locking, single-card reroll, and date assignment
+- History & Family Favorites sub-navigation with 1-click plan insertion
 
 ### Key Functions
-- `generateMealPlanServer()` - Calls Gemini API with preferences
-- `approveMealPlanServer()` - Creates documents, shopping list, and calendar events
-- `consolidateShoppingList()` - Intelligently merges and deduplicates ingredients
-- `getRecipeHistory()` - Retrieves past recipes from Drive
+- `generateMealPlanServer()` - Calls Gemini API with user preferences, mood chips, locked cards, and reused staples
+- `rerollSingleRecipeServer()` - Swaps an individual recipe while preventing duplicate dishes
+- `approveMealPlanServer()` - Creates Google Calendar dinner and grocery events and caches structured recipes
+- `createRecipeDocServer()` - On-demand generation of formatted Google Docs for individual recipes
+- `toggleFavoriteRecipeServer()` - Binary favorite starring in persistent Google Drive library
+- `loadAppData()` - Initializes database, performs schema migrations, and checks API key status
 
 ## Database Schema
 
-The application stores data in a JSON file with the following structure:
+The application stores data in `Automated_Meal_Planner_DB.json` in Google Drive with the following structure:
 
 ```json
 {
   "preferences": {
     "allergies": "string",
     "dietaryPreferences": "string",
-    "cuisinePreferences": {
-      "Italian": "prefer",
-      "Chinese": "avoid"
-    },
-    "dinersCount": number,
-    "defaultMealTime": "HH:MM AM/PM or HH:MM"
+    "cuisinePreferences": {},
+    "dinersCount": 2,
+    "defaultMealTime": "06:00 PM",
+    "skipWelcomePage": false
   },
   "mealPlan": {
     "recipes": [
@@ -176,28 +173,41 @@ The application stores data in a JSON file with the following structure:
         "ingredients": [
           {
             "name": "string",
-            "amount": number,
-            "unit": "string"
+            "amount": 2,
+            "unit": "tbsp"
           }
         ],
-        "instructions": ["string"]
+        "instructions": [
+          "string"
+        ],
+        "isLocked": false,
+        "isReused": false
       }
     ],
-    "approved": boolean,
-    "generatedAt": "ISO 8601 timestamp",
+    "approved": true,
+    "generatedAt": "2026-09-20T12:00:00.000Z",
+    "planPreferences": "string",
     "executionResult": {
-      "recipeDocs": [
-        {
-          "name": "string",
-          "date": "YYYY-MM-DD",
-          "url": "string"
-        }
-      ],
-      "shoppingListDocUrl": "string",
-      "calendarEventsCreated": number
+      "calendarEventsCreated": 7,
+      "groceriesEventCreated": true
     }
   },
-  "lastUpdated": "ISO 8601 timestamp"
+  "recipeLibrary": {
+    "Lemon Herb Salmon": {
+      "name": "Lemon Herb Salmon",
+      "description": "string",
+      "prepTime": "15m",
+      "cookTime": "20m",
+      "ingredients": [],
+      "instructions": [],
+      "isFavorite": true,
+      "createdAt": "2026-09-20T12:00:00.000Z",
+      "lastScheduledDate": "2026-09-21",
+      "originalDiners": 2,
+      "docUrl": ""
+    }
+  },
+  "lastUpdated": "2026-09-20T12:00:00.000Z"
 }
 ```
 
@@ -222,7 +232,7 @@ npm run deploy   # Create a new versioned deployment in Apps Script
 The repository includes a consolidated headless test runner and a deterministic **Tier 1 Prompt Evaluation Test Harness** to guard against prompt regressions, safety hazards, and schema drift.
 
 ```bash
-# Run all 17 consolidated test suites (DOM, CSS, Backend, DB, & Tier 1 Prompt Eval)
+# Run all consolidated test suites (DOM, CSS, Backend, DB, & Tier 1 Prompt Eval)
 npm test
 
 # Run the dedicated Tier 1 Deterministic Prompt Evaluation benchmark suite (mocked)
@@ -236,7 +246,7 @@ npm run test:prompts:live
 1. **JSON Schema Integrity (100% Target):** Enforces complete recipe contracts (`name`, `description`, `prepTime`, `cookTime`, `ingredients`, `instructions`).
 2. **Hard Allergen Scanning (P0 Zero-Tolerance Gate):** Regex scans ingredients and instructions against a dictionary of allergens and derivatives (e.g., soy sauce, tamari, almond flour).
 3. **Avoided Cuisine Absence (P0 Gate):** Guarantees zero contamination from avoided cuisines.
-4. **Time Duration Bounds:** Confirms $\text{total preparation and cooking time} \le 30$ minutes when the `quick` tag (`⚡ Under 30 Mins`) is active.
+4. **Time Duration Bounds:** Confirms total preparation and cooking time $\le 30$ minutes when the quick tag (`⚡ 20-30 Min Quick Meals`) is active.
 5. **Pantry Ingredient Utilization:** Verifies on-hand fridge ingredients are prioritized in the initial meal plan dishes.
 6. **Prompt Injection Boundary Isolation:** Confirms freeform user notes (`planPreferences`) cannot override system safety directives.
 
@@ -266,20 +276,20 @@ npm run ship
 ### Debugging
 - Check Apps Script Execution Log: **Executions** panel in Apps Script editor
 - Browser console logs available via browser DevTools
-- Google Apps Script Stackdriver Logging enabled via appsscript.json
+- Google Apps Script Stackdriver Logging enabled via `appsscript.json`
 
 ## Troubleshooting
 
-### "API key is not configured"
-- Go to Settings and add your Gemini API key
-- Ensure the key is valid and not expired
+### "Gemini API key is not configured"
+- Go to Settings and check API key status
+- If the shared key quota is full or unavailable, paste your free Google AI Studio API key and click **Save API Key**
 
 ### "No active meal plan found to approve"
-- Generate a new meal plan first using **Generate Plan**
+- Generate a new meal plan first using the **Planner** tab
 
 ### Calendar events not created
-- Verify Google Calendar access is enabled for your account
-- Check that the default calendar is accessible
+- Verify Google Calendar access is enabled and authorized for your Google Account
+- Check that your primary/default Google Calendar is accessible
 
 ### Shopping list contains duplicates
 - This is expected if recipes use the same ingredient with different units
@@ -287,24 +297,19 @@ npm run ship
 
 ## API Costs
 
-- **Gemini API**: Free tier available (60 requests/min)
-- **Google Services**: Free within Apps Script quotas
+- **Gemini API**: Free tier available on Google AI Studio
+- **Google Services**: Free within Google Apps Script quotas
 - No additional charges for Google Drive, Docs, or Calendar access
 
 ## License
 
 ISC License
 
-## Contributing
-
-To contribute improvements:
-1. Test changes locally with `npm run watch`
-2. Submit pull requests with detailed descriptions
-3. Ensure code follows existing style
-
 ## Support
 
-For issues or feature requests, please open a GitHub issue in this repository.
+For questions, feature requests, or feedback:
+- **Contact:** Phil at [phil@milehighdataviz.com](mailto:phil@milehighdataviz.com)
+- **Website:** [Mile High Data Viz](https://milehighdataviz.com)
 
 ---
 
