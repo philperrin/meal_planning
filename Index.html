@@ -5,8 +5,7 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>Meal Planning Assistant</title>
-  <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
   <!-- Include Premium CSS Stylesheet -->
   <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
 </head>
@@ -353,7 +352,7 @@
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
             Upon meal plan approval, the assistant will automatically generate:
           </p>
-          <ul
+          <ul style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
             <li>Prep & cook events scheduled on your default Google Calendar with complete recipe details and instructions in the event description.</li>
             <li>A dedicated <strong>Groceries</strong> event on your Google Calendar containing your complete grocery list organized by store section.</li>
           </ul>
