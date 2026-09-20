@@ -5,7 +5,8 @@
   <base target="_top">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>Meal Planning Assistant</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E🍽️%3C/text%3E%3C/svg%3E">
   <!-- Include Premium CSS Stylesheet -->
   <?!= HtmlService.createHtmlOutputFromFile('Styles').getContent(); ?>
 </head>
@@ -47,7 +48,8 @@
             <h2 class="welcome-title">Welcome!</h2>
             <p class="welcome-lead">
               I'm your intelligent meal planning assistant - designed to streamline your weekly dinner planning. I'll
-              help generate balanced meal plans, schedule complete meals onto your Google Calendar, and create a consolidated grocery list event.
+              help generate balanced meal plans, schedule complete meals onto your Google Calendar, and create a
+              consolidated grocery list.
             </p>
             <div class="welcome-skip-container">
               <label class="welcome-skip-label" for="skip-welcome-checkbox">
@@ -82,7 +84,7 @@
             </div>
             <h3 class="welcome-card-title">Setting Preferences</h3>
             <p class="welcome-card-desc">
-              Set your <strong>Preferences</strong> for allergies, dietary goals, preferred cuisines, diners, and prep time.</p>
+              Set your <strong>Preferences</strong> for allergies, preferred cuisines, diner count, and meal times.</p>
             <button class="welcome-card-btn" type="button"
               onclick="event.stopPropagation(); switchView('preferences');">
               Set Preferences <span>→</span>
@@ -95,7 +97,7 @@
               <span class="welcome-step-num">Step 3</span>
               <span class="welcome-card-icon">🗓️</span>
             </div>
-            <h3 class="welcome-card-title">Generating Meal Plans</h3>
+            <h3 class="welcome-card-title">Generate Meal Plans</h3>
             <p class="welcome-card-desc">
               Use the <strong>Planner</strong> tab to generate customized dinners - creating a shopping list and
               calendar events for each meal.</p>
@@ -111,12 +113,11 @@
               <span class="welcome-card-icon">📜</span>
             </div>
             <div class="welcome-card-title-row">
-              <h3 class="welcome-card-title">Reviewing Past Meals</h3>
-              <span class="welcome-upcoming-badge">Coming Soon</span>
+              <h3 class="welcome-card-title">Review Past Meals</h3>
             </div>
             <p class="welcome-card-desc">
-              Use the <strong>History</strong> tab to review previous recipes stored in Google Drive, with upcoming
-              features to rate and incorporate past favorites into new plans.
+              Use the <strong>History</strong> tab to review previous recipes, add recipes to a 'Favorites' list, and
+              re-use recipes.
             </p>
             <button class="welcome-card-btn" type="button" onclick="event.stopPropagation(); switchView('history');">
               Explore History <span>→</span>
@@ -129,7 +130,7 @@
       <div class="view" id="planner-view">
         <div class="panel" style="margin-bottom: 24px; padding: 24px;">
           <div class="form-group" style="margin-bottom: 20px;">
-            <label for="plan-preferences-input">Preferences for this meal plan</label>
+            <label for="plan-preferences-input">Preferences for this week's plan</label>
             <div class="input-desc">Input specific ideas or needs for certain meals this week (e.g. 'I'd like one
               pizza
               night that includes margherita pizza')</div>
@@ -140,30 +141,37 @@
           <div class="planner-chips-section">
             <div class="planner-chips-label">⚡ Quick Presets</div>
             <div class="input-desc" style="margin-top: 4px; margin-bottom: 12px; font-size: 13px;">
-              Select one or more presets. One meal in the meal plan will include the presets (not all meals will have all presets applied).
+              Select one or more presets. One meal in the meal plan will include the presets (not all meals will have
+              all presets applied).
             </div>
             <div class="planner-chips-grid" id="planner-chips-container">
-              <button type="button" class="filter-chip" id="chip-quick" data-tag="quick" onclick="handleToggleFilterChip('quick')">
+              <button type="button" class="filter-chip" id="chip-quick" data-tag="quick"
+                onclick="handleToggleFilterChip('quick')">
                 <span class="chip-icon">⚡</span>
                 <span>20-30 Min Quick Meals</span>
               </button>
-              <button type="button" class="filter-chip" id="chip-one_pot" data-tag="one_pot" onclick="handleToggleFilterChip('one_pot')">
+              <button type="button" class="filter-chip" id="chip-one_pot" data-tag="one_pot"
+                onclick="handleToggleFilterChip('one_pot')">
                 <span class="chip-icon">🥘</span>
                 <span>One-Pot / Sheet Pan</span>
               </button>
-              <button type="button" class="filter-chip" id="chip-kid_friendly" data-tag="kid_friendly" onclick="handleToggleFilterChip('kid_friendly')">
+              <button type="button" class="filter-chip" id="chip-kid_friendly" data-tag="kid_friendly"
+                onclick="handleToggleFilterChip('kid_friendly')">
                 <span class="chip-icon">👶</span>
                 <span>Kid-Friendly / Picky-Safe</span>
               </button>
-              <button type="button" class="filter-chip" id="chip-slow_cooker" data-tag="slow_cooker" onclick="handleToggleFilterChip('slow_cooker')">
+              <button type="button" class="filter-chip" id="chip-slow_cooker" data-tag="slow_cooker"
+                onclick="handleToggleFilterChip('slow_cooker')">
                 <span class="chip-icon">❄️</span>
                 <span>Slow Cooker / Instant Pot</span>
               </button>
-              <button type="button" class="filter-chip" id="chip-high_veggie" data-tag="high_veggie" onclick="handleToggleFilterChip('high_veggie')">
+              <button type="button" class="filter-chip" id="chip-high_veggie" data-tag="high_veggie"
+                onclick="handleToggleFilterChip('high_veggie')">
                 <span class="chip-icon">🥦</span>
                 <span>High-Veggie / Light</span>
               </button>
-              <button type="button" class="filter-chip" id="chip-comfort" data-tag="comfort" onclick="handleToggleFilterChip('comfort')">
+              <button type="button" class="filter-chip" id="chip-comfort" data-tag="comfort"
+                onclick="handleToggleFilterChip('comfort')">
                 <span class="chip-icon">🧀</span>
                 <span>Comfort Classics</span>
               </button>
@@ -200,19 +208,22 @@
             <div>
               <h2 class="panel-title" style="margin-bottom: 4px;">📜 Past Recipes & ⭐ Family Favorites</h2>
               <p id="history-desc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 0;">
-                Review past recipes, star family favorites, and click <strong>+ Add to Plan</strong> to instantly slot staple recipes into your active weekly plan.
+                Review past recipes, star family favorites, and click <strong>+ Add to Plan</strong> to instantly slot
+                staple recipes into your active weekly plan.
               </p>
             </div>
           </div>
 
           <!-- History Sub-Navigation Tabs -->
           <div class="history-subnav">
-            <button type="button" class="history-subtab active" id="subtab-history-recent" onclick="switchHistoryTab('recent')">
+            <button type="button" class="history-subtab active" id="subtab-history-recent"
+              onclick="switchHistoryTab('recent')">
               <span class="subtab-icon">📜</span>
               <span>Recipe History</span>
               <span class="subtab-badge" id="badge-recent-count">0</span>
             </button>
-            <button type="button" class="history-subtab" id="subtab-history-favorites" onclick="switchHistoryTab('favorites')">
+            <button type="button" class="history-subtab" id="subtab-history-favorites"
+              onclick="switchHistoryTab('favorites')">
               <span class="subtab-icon">⭐</span>
               <span>Family Favorites</span>
               <span class="subtab-badge" id="badge-favorites-count">0</span>
@@ -226,7 +237,8 @@
               <span id="reuse-banner-text"><strong>0 recipes</strong> selected to re-use</span>
             </div>
             <div class="reuse-banner-actions">
-              <button type="button" class="btn btn-sm btn-gold" onclick="switchView('planner')">🗓️ Open in Planner</button>
+              <button type="button" class="btn btn-sm btn-gold" onclick="switchView('planner')">🗓️ Open in
+                Planner</button>
               <button type="button" class="btn btn-secondary btn-sm" onclick="clearReusedRecipes()">✕ Clear</button>
             </div>
           </div>
@@ -240,17 +252,21 @@
       <!-- VIEW: PREFERENCES -->
       <div class="view" id="preferences-view">
         <div class="panel">
-          <h2 class="panel-title">Dietary & Meal Preferences</h2>
+          <h2 class="panel-title">💖 Dietary & Meal Preferences</h2>
+          <p id="preferences-desc" style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-top: -12px; margin-bottom: 20px;">
+            Set your household defaults, dietary restrictions, preferred cuisines, diner count, and meal schedule. These preferences automatically guide every generated meal plan.
+          </p>
 
           <div class="form-group">
-            <label for="pref-allergies">Dietary Allergy Constraints</label>
-            <div class="input-desc">Specify any ingredients to strictly avoid due to allergies.</div>
+            <label for="pref-allergies">Allergy & Sensitivity Constraints</label>
+            <div class="input-desc">Specify any ingredients to strictly avoid due to allergies or sensitivities.</div>
             <textarea id="pref-allergies" placeholder="e.g., No eggs..."></textarea>
           </div>
 
           <div class="form-group">
             <label for="pref-dietary-preferences">Dietary & Cuisine Preferences</label>
-            <div class="input-desc">Specify general dietary choices, preferred cuisines (e.g., Italian, Mexican, Mediterranean, Asian-inspired), dietary styles, or specific dislikes.</div>
+            <div class="input-desc">Specify general dietary choices, preferred cuisines (e.g., Italian, Mexican,
+              Mediterranean, Asian-inspired), dietary styles, or specific dislikes.</div>
             <textarea id="pref-dietary-preferences"
               placeholder="e.g., Prefer Mediterranean, Mexican, and Italian cuisines. High protein, lean meats, plenty of vegetables..."></textarea>
           </div>
@@ -352,9 +368,12 @@
           <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
             Upon meal plan approval, the assistant will automatically generate:
           </p>
-          <ul style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
-            <li>Prep & cook events scheduled on your default Google Calendar with complete recipe details and instructions in the event description.</li>
-            <li>A dedicated <strong>Groceries</strong> event on your Google Calendar containing your complete grocery list organized by store section.</li>
+          <ul
+            style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-left: 20px; margin-top: 6px;">
+            <li>Prep & cook events scheduled on your default Google Calendar with complete recipe details and
+              instructions in the event description.</li>
+            <li>A dedicated <strong>Groceries</strong> event on your Google Calendar containing your complete grocery
+              list organized by store section.</li>
           </ul>
         </div>
       </div>
