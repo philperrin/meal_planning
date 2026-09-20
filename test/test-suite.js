@@ -914,14 +914,14 @@ describe('9. Meal Plan Generation with Recipe Reuse (MPA-8)', () => {
     assertEqual(callCountA, 2, 'Should have retried once after 503');
     assertEqual(resA.db.mealPlan.recipes[0].name, "Recovered Salmon");
 
-    // Case B: gemini-3.5-flash fails all 3 attempts with 503 -> falls back to gemini-2.5-flash
+    // Case B: gemini-3.6-flash fails all 3 attempts with 503 -> falls back to gemini-3.5-flash
     const urlsCalled = [];
     const mockFetchWithModelFallback = (url, options) => {
       urlsCalled.push(url);
-      if (url.includes("gemini-3.5-flash")) {
+      if (url.includes("gemini-3.6-flash")) {
         return {
           getResponseCode: () => 503,
-          getContentText: () => JSON.stringify({ error: { code: 503, message: "gemini-3.5-flash unavailable" } })
+          getContentText: () => JSON.stringify({ error: { code: 503, message: "gemini-3.6-flash unavailable" } })
         };
       }
       // Fallback model returns 200
@@ -933,7 +933,7 @@ describe('9. Meal Plan Generation with Recipe Reuse (MPA-8)', () => {
               parts: [{
                 text: JSON.stringify({
                   recipes: [{
-                    name: "Fallback 2.5 Flash Tacos",
+                    name: "Fallback 3.5 Flash Tacos",
                     description: "Tasty fallback tacos",
                     prepTime: "10 mins",
                     cookTime: "15 mins",
@@ -951,9 +951,47 @@ describe('9. Meal Plan Generation with Recipe Reuse (MPA-8)', () => {
     const contextB = createMockGasContext(db, userProps, {}, [], mockFetchWithModelFallback);
     const resB = contextB.generateMealPlanServer(1, "");
     assertEqual(resB.success, true, 'Generation should succeed on fallback model');
-    assertEqual(resB.db.mealPlan.recipes[0].name, "Fallback 2.5 Flash Tacos");
-    assert(urlsCalled.some(u => u.includes("gemini-3.5-flash")), 'Should have attempted primary model first');
-    assert(urlsCalled.some(u => u.includes("gemini-2.5-flash")), 'Should have fallen back to gemini-2.5-flash');
+    assertEqual(resB.db.mealPlan.recipes[0].name, "Fallback 3.5 Flash Tacos");
+    assert(urlsCalled.some(u => u.includes("gemini-3.6-flash")), 'Should have attempted primary model first');
+    assert(urlsCalled.some(u => u.includes("gemini-3.5-flash")), 'Should have fallen back to gemini-3.5-flash');
+
+    // Case C: Deprecated model returns 404 -> immediately skips to next model without waiting/retrying
+    let attempts404 = 0;
+    const mockFetchWith404Skip = (url, options) => {
+      if (url.includes("gemini-3.6-flash")) {
+        attempts404++;
+        return {
+          getResponseCode: () => 404,
+          getContentText: () => JSON.stringify({ error: { code: 404, message: "Model deprecated" } })
+        };
+      }
+      return {
+        getResponseCode: () => 200,
+        getContentText: () => JSON.stringify({
+          candidates: [{
+            content: {
+              parts: [{
+                text: JSON.stringify({
+                  recipes: [{
+                    name: "Fast Skipped Dish",
+                    description: "Skipped 404 immediately",
+                    prepTime: "10 mins",
+                    cookTime: "10 mins",
+                    ingredients: [{ name: "rice", amount: 1, unit: "cup" }],
+                    instructions: ["Cook."]
+                  }]
+                })
+              }]
+            }
+          }]
+        })
+      };
+    };
+
+    const contextC = createMockGasContext(db, userProps, {}, [], mockFetchWith404Skip);
+    const resC = contextC.generateMealPlanServer(1, "");
+    assertEqual(resC.success, true, 'Should succeed on next model');
+    assertEqual(attempts404, 1, '404 error should not be retried, skipped on first attempt');
   });
 });
 

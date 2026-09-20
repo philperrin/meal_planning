@@ -551,17 +551,18 @@ function buildPantryDirectiveText(pantryIngredients, targetMealsCount) {
   return "- CRITICAL: You MUST prioritize using the following on-hand ingredients across the first " + n + " meals to prevent food waste: [" + cleaned.join(", ") + "]. Ensure these ingredients are explicitly incorporated and clearly listed in those recipes' ingredients lists.\n";
 }
 
-var PRIMARY_GEMINI_MODEL = "gemini-3.5-flash";
-var FALLBACK_GEMINI_MODEL = "gemini-2.5-flash";
+var PRIMARY_GEMINI_MODEL = "gemini-3.6-flash";
+var FALLBACK_GEMINI_MODEL = "gemini-3.5-flash";
+var GEMINI_MODELS_CASCADE = ["gemini-3.6-flash", "gemini-3.5-flash", "gemini-1.5-flash"];
 var MAX_RETRIES_PER_MODEL = 3;
 var INITIAL_RETRY_DELAY_MS = 1500;
 
 /**
  * Executes a Gemini API generateContent call with automatic exponential backoff on 503/500/502/504
- * and automatic fallback to gemini-2.5-flash if the primary model is unavailable or overloaded.
+ * and automatic fallback cascade (gemini-3.6-flash -> gemini-3.5-flash -> gemini-1.5-flash).
  */
 function callGeminiWithRetryAndFallback(payload, apiKey, effectiveKey) {
-  var modelsToTry = [PRIMARY_GEMINI_MODEL, FALLBACK_GEMINI_MODEL];
+  var modelsToTry = GEMINI_MODELS_CASCADE;
   var lastError = null;
 
   for (var m = 0; m < modelsToTry.length; m++) {
@@ -603,12 +604,19 @@ function callGeminiWithRetryAndFallback(payload, apiKey, effectiveKey) {
           }
         }
 
-        // Transient Server Errors: 503 (Unavailable/High Demand), 500 (Internal), 502, 504, 404 (Model not found)
-        if (responseCode === 503 || responseCode === 500 || responseCode === 502 || responseCode === 504 || responseCode === 404) {
+        // Model not found / deprecated (404) -> Skip immediately to next model in cascade without retrying
+        if (responseCode === 404) {
+          Logger.log("Gemini model " + modelName + " returned 404 Not Found. Skipping to next model in cascade: " + responseText);
+          lastError = new Error("Gemini API error (Status 404): " + responseText);
+          break; // break retry loop immediately to try next model in cascade
+        }
+
+        // Transient Server Errors: 503 (Unavailable/High Demand), 500 (Internal), 502, 504
+        if (responseCode === 503 || responseCode === 500 || responseCode === 502 || responseCode === 504) {
           Logger.log("Gemini API returned " + responseCode + " for model " + modelName + " (attempt " + attempt + "/" + MAX_RETRIES_PER_MODEL + "): " + responseText);
           lastError = new Error("Gemini API error (Status " + responseCode + "): " + responseText);
 
-          if (attempt < MAX_RETRIES_PER_MODEL && responseCode !== 404) {
+          if (attempt < MAX_RETRIES_PER_MODEL) {
             var waitTime = delayMs + Math.floor(Math.random() * 500);
             if (typeof Utilities !== 'undefined' && Utilities.sleep) {
               Utilities.sleep(waitTime);
@@ -623,7 +631,7 @@ function callGeminiWithRetryAndFallback(payload, apiKey, effectiveKey) {
         // Non-retryable error (e.g. 400 Bad Request, 403 Forbidden)
         throw new Error("Gemini API error (Status " + responseCode + "): " + responseText);
       } catch (err) {
-        // If it's already a formatted client/user error (like 429 or 400), don't retry, rethrow immediately
+        // If it's already a formatted client/user error (like 429, 400, 403), rethrow immediately
         if (err.message && (err.message.indexOf("quota") !== -1 || err.message.indexOf("Status 400") !== -1 || err.message.indexOf("Status 403") !== -1)) {
           throw err;
         }
@@ -638,11 +646,11 @@ function callGeminiWithRetryAndFallback(payload, apiKey, effectiveKey) {
     }
 
     if (m < modelsToTry.length - 1) {
-      Logger.log("Switching to fallback model: " + modelsToTry[m + 1] + " after primary model " + modelName + " failed.");
+      Logger.log("Switching to fallback model: " + modelsToTry[m + 1] + " after model " + modelName + " failed.");
     }
   }
 
-  throw lastError || new Error("Failed to generate response from Gemini API after retries and fallback.");
+  throw lastError || new Error("Failed to generate response from Gemini API after retries and model cascade.");
 }
 
 /**
