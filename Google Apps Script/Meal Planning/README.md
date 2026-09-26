@@ -23,7 +23,7 @@ A Google Apps Script web application that automates weekly meal planning using G
 ### Project Files
 
 ```
-meal_planning/
+Google Apps Script/Meal Planning/
 ├── Code.gs              # Backend Apps Script (AI prompts, Calendar, Docs, Drive DB)
 ├── Index.html           # Main UI layout and view templates
 ├── JavaScript.html      # Client-side state management, UI rendering, and server calls
